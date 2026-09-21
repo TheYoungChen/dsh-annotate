@@ -890,10 +890,27 @@ chrome.action.onClicked.addListener((tab) => {
   // still active, so awaiting anything first — a status read, a config reload —
   // makes the call fail and the panel silently never appears. Everything that
   // needs to be asynchronous therefore starts after this call, not before it.
+  //
+  // The namespace is checked rather than assumed. It is absent when the running
+  // build predates the `sidePanel` permission in the manifest — Chrome does not
+  // re-read a manifest on reload alone, so an extension can be serving code that
+  // calls an API its own registered manifest never granted. Reading the property
+  // off `undefined` throws a TypeError that names a character offset instead of
+  // the cause, so the check turns a puzzling crash into a sentence.
+  const panel = chrome.sidePanel
+  if (panel === undefined) {
+    report(
+      'error',
+      '[dsh-annotate] the side panel API is unavailable. The extension is running a build '
+      + 'whose manifest does not grant the "sidePanel" permission — remove and re-add the '
+      + 'unpacked extension so Chrome re-reads manifest.json.',
+    )
+    return
+  }
   const windowId = tab.windowId
   const opened = windowId === undefined
-    ? chrome.sidePanel.open(tab.id === undefined ? {} : { tabId: tab.id })
-    : chrome.sidePanel.open({ windowId })
+    ? panel.open(tab.id === undefined ? {} : { tabId: tab.id })
+    : panel.open({ windowId })
   void opened.catch((error: unknown) => {
     // A window that closed between the click and the call is ordinary; a
     // rejected gesture is not, and saying so is the only way it gets noticed.

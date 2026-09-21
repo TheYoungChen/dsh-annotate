@@ -191,4 +191,37 @@ describe('the toolbar button opens the side panel', () => {
       `both jobs must run; the recorded calls were ${JSON.stringify([...calls])}`,
     )
   })
+
+  it('reports the cause instead of crashing when the API is absent', async () => {
+    // This is the failure that actually shipped. Chrome exposes `chrome.sidePanel`
+    // only when the running manifest grants the permission, and an installed
+    // extension can be serving newer code than the manifest it registered —
+    // reloading does not re-read manifest.json. Reaching through `undefined`
+    // produced `TypeError: Cannot read properties of undefined (reading 'open')`
+    // naming a character offset, which says nothing about the permission.
+    const listener = await loadWorker()
+    const stub = (globalThis as { chrome?: { sidePanel?: unknown } }).chrome
+    const saved = stub?.sidePanel
+    if (stub !== undefined) delete stub.sidePanel
+
+    const reported: string[] = []
+    const realError = console.error
+    console.error = (...args: unknown[]) => { reported.push(args.map(String).join(' ')) }
+    try {
+      listener({ id: 3, windowId: 7, url: 'https://example.test/' })
+      await new Promise((resolve) => setImmediate(resolve))
+    } finally {
+      console.error = realError
+      if (stub !== undefined) stub.sidePanel = saved
+    }
+
+    assert.ok(
+      reported.some((line) => line.includes('sidePanel')),
+      `an absent API must be reported by name; console.error saw ${JSON.stringify(reported)}`,
+    )
+    assert.ok(
+      reported.some((line) => line.includes('re-add')),
+      'the report must say what to do about it',
+    )
+  })
 })
