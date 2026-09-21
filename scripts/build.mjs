@@ -75,6 +75,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { findEsbuild as locateEsbuild } from './esbuild-locator.mjs'
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -132,112 +133,31 @@ function outputPath(value) {
 // ---------------------------------------------------------------------------
 
 /** Directory names a checkout keeps its installed packages in. */
-const STORE_DIRS = ['.pnpm', 'node_modules']
-
-/**
- * Directories that may hold an esbuild install, most specific first.
- *
- * `ESBUILD_BIN` short-circuits the search with an explicit executable. The
- * others are the package's own `node_modules` (a contributor who installed one
- * gets exactly their version), the workspace this repository lives in, and any
- * sibling checkout, which is where this project already looks for the types it
- * compiles against.
- */
-function candidateRoots() {
-  const roots = [join(packageRoot, 'node_modules')]
-  let dir = packageRoot
-  // Walk up a bounded number of levels, skipping duplicates. A package manager
-  // may hoist an install above the repository, and a workspace layout is exactly
-  // that case: the install sits beside the workspace rather than inside it.
-  for (let hops = 0; hops < 6; hops += 1) {
-    const parent = dirname(dir)
-    if (parent === dir) break
-    dir = parent
-    for (const name of ['node_modules', 'deepseek-harness']) {
-      const modules = name === 'node_modules' ? join(dir, name) : join(dir, name, 'node_modules')
-      if (existsSync(modules) && !roots.includes(modules)) roots.push(modules)
-    }
-  }
-  return roots
-}
-
-/** Every `.pnpm`-style store entry that looks like an esbuild install. */
-function storeEntries(dir) {
-  const entries = []
-  for (const store of STORE_DIRS) {
-    const storeDir = join(dir, store)
-    if (!existsSync(storeDir)) continue
-    let names
-    try {
-      names = readdirSync(storeDir)
-    } catch {
-      continue
-    }
-    for (const name of names) {
-      // `esbuild@1.2.3` in a pnpm store, `esbuild` in a flat install.
-      if (name === 'esbuild' || name.startsWith('esbuild@')) entries.push(join(storeDir, name, 'node_modules', 'esbuild'))
-    }
-  }
-  const flat = join(dir, 'esbuild')
-  if (existsSync(flat)) entries.push(flat)
-  return entries
-}
-
-/**
- * The platform binary inside an esbuild install.
- *
- * esbuild's JavaScript entry point is a launcher for a native executable, and
- * the executable is the part worth invoking. It lives either beside the package
- * (a flat install) or under `@esbuild/<platform>` in the same `node_modules`
- * directory that holds the package — which is where a store install keeps it,
- * reached through a relative path that only resolves there.
- *
- * @param packageDir - an esbuild package directory.
- * @returns the executable's path, or `null` when this install has none.
- */
-function platformBinary(packageDir) {
-  const exe = process.platform === 'win32' ? 'esbuild.exe' : 'esbuild'
-  const platform = `${process.platform}-${process.arch}`
-  const candidates = [
-    join(packageDir, exe),
-    join(packageDir, 'bin', exe),
-    // Sibling of the package: the store layout for a store install, and the
-    // hoisted layout for a flat one.
-    join(dirname(packageDir), '@esbuild', platform, exe),
-    join(packageDir, 'node_modules', '@esbuild', platform, exe),
-  ]
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate
-  }
-  return null
-}
+// ---------------------------------------------------------------------------
+// esbuild
+// ---------------------------------------------------------------------------
 
 /**
  * Find an esbuild executable.
  *
+ * The search itself lives in `esbuild-locator.mjs` because the DSH-side build
+ * needs exactly the same one; the reasoning behind it — a native executable
+ * rather than the package, and no junction into a store — is documented there.
+ *
  * @returns the executable's path.
  */
 function findEsbuild() {
-  const explicit = process.env['ESBUILD_BIN']
-  if (typeof explicit === 'string' && explicit !== '') {
-    if (!existsSync(explicit)) fail(`ESBUILD_BIN points at ${explicit}, which does not exist`)
-    return explicit
+  const binary = locateEsbuild(packageRoot)
+  if (binary === null) {
+    fail(
+      'no esbuild executable found.\n'
+      + '  The extension sources are TypeScript with explicit `.ts` import specifiers, so a\n'
+      + '  bundler is required. This repository adds no dependency of its own: install esbuild\n'
+      + '  where this script can see it (a sibling checkout\'s `node_modules` is searched), or\n'
+      + '  point ESBUILD_BIN at an executable.',
+    )
   }
-
-  for (const root of candidateRoots()) {
-    for (const packageDir of storeEntries(root)) {
-      const binary = platformBinary(packageDir)
-      if (binary !== null) return binary
-    }
-  }
-
-  fail(
-    'no esbuild executable found.\n'
-    + '  The extension sources are TypeScript with explicit `.ts` import specifiers, so a\n'
-    + '  bundler is required. This repository adds no dependency of its own: install esbuild\n'
-    + '  where this script can see it (a sibling checkout\'s `node_modules` is searched), or\n'
-    + '  point ESBUILD_BIN at an executable.',
-  )
+  return binary
 }
 
 // ---------------------------------------------------------------------------
