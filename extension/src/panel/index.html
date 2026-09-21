@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      Both schemes are declared so the browser paints form controls, scrollbars
+      and the default background to match the stylesheet, rather than flashing a
+      light control set inside a dark panel.
+    -->
+    <meta name="color-scheme" content="light dark" />
+    <title>dsh-annotate</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="panel" class="panel" data-state="idle">
+      <header class="head">
+        <h1 class="title">Annotate</h1>
+        <p id="count-line" class="count"></p>
+      </header>
+
+      <p id="page-line" class="page-line" hidden></p>
+
+      <section id="picking-banner" class="banner" hidden aria-live="polite">
+        <span class="banner-dot" aria-hidden="true"></span>
+        <span id="picking-hint" class="banner-text"></span>
+      </section>
+
+      <div class="primary-row">
+        <button id="primary-action" type="button" class="button button-primary" aria-pressed="false">
+          Start annotating
+        </button>
+      </div>
+
+      <section id="composer" class="composer" hidden aria-label="Comment on the selected element">
+        <p id="composer-target" class="composer-target"></p>
+        <label class="visually-hidden" for="composer-input">Comment on the selected element</label>
+        <textarea
+          id="composer-input"
+          class="composer-input"
+          rows="3"
+          spellcheck="false"
+          placeholder="What should change here? Enter saves the comment, Shift+Enter adds a line."
+        ></textarea>
+        <div class="composer-actions">
+          <button id="save-comment" type="button" class="button button-primary">Save comment</button>
+          <button id="send-without-comment" type="button" class="button">Send without comment</button>
+        </div>
+      </section>
+
+      <section class="list-section" aria-label="Selected elements">
+        <p id="empty-state" class="empty">
+          No elements yet. Start annotating, then click an element on the page.
+        </p>
+        <!--
+          The rows are built by the panel rather than written here: every value
+          in them is authored by the page being annotated, and building them as
+          text nodes is what keeps page content from ever reaching an HTML
+          parser inside this document.
+        -->
+        <ul id="annotation-list" class="list"></ul>
+      </section>
+
+      <footer class="foot">
+        <div class="foot-actions">
+          <button id="submit-batch" type="button" class="button button-primary" disabled>Send batch to DSH</button>
+          <button id="clear-batch" type="button" class="button button-quiet" disabled>Clear all</button>
+        </div>
+        <p id="status-line" class="status" role="status" aria-live="polite"></p>
+        <button id="retry-submit" type="button" class="button button-quiet retry" hidden>Retry sending</button>
+      </footer>
+    </main>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

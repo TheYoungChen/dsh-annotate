@@ -1,0 +1,27 @@
+{
+  "//": [
+    "Typechecks the test suites, which the shipping tsconfig deliberately excludes.",
+    "",
+    "The suites are plain JavaScript inside `.ts` files on purpose: Node strips the",
+    "(absent) annotations and runs them directly, so the project needs no test",
+    "toolchain and the tests exercise `src/` rather than a build output. Fixtures",
+    "are built by spreading partial literals, which is exactly the idiom a",
+    "strict checker rejects even when the tests are sound where it matters.",
+    "",
+    "So this config checks the tests for the errors that actually break them —",
+    "typos, missing imports, misuse of the module under test — while leaving the",
+    "fixture ergonomics alone. `noUncheckedIndexedAccess` stays on because a test",
+    "reading `rows[0].text` unchecked is a test that fails confusingly.",
+    "",
+    "Shipping code under `src/` and `extension/src/` is still checked at full",
+    "strictness by tsconfig.json: that is the check guarding the published artifact."
+  ],
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "exactOptionalPropertyTypes": false,
+    "types": ["node"]
+  },
+  "include": ["tests/**/*.ts", "test/**/*.ts", "extension/src/**/*.d.ts"]
+}
+

@@ -4,9 +4,20 @@ node_modules/
 # Build output — the repository ships source, not artifacts
 lib/
 dist/
-extension/**/*.js
 build/
 *.tsbuildinfo
+
+# The extension is built into place, next to its manifest, because that is the
+# directory a browser loads as an unpacked extension. Everything the build
+# writes is derived from `extension/src`, so it is ignored here rather than
+# committed: the `extension/src` tree is the only copy that gets edited.
+#
+# The manifest is excluded from the ignore rules below on purpose — it is
+# hand-written source that happens to live at the extension root.
+extension/**/*.js
+extension/**/*.js.map
+extension/panel/
+!extension/manifest.json
 
 # Local environment
 .env

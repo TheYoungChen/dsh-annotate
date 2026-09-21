@@ -19,8 +19,17 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+// Loaded for its module augmentation only: `@deepseek-ai/dsh-host-webserver`
+// declares `Context.webServer`, and a declaration merge only applies when the
+// declaring module is part of the program. Without this import the route
+// registration below fails to typecheck even though the runtime service exists.
+import type {} from '@deepseek-ai/dsh-host-webserver'
 import { BridgeServer, type BridgeLogger, type BridgeStatus } from './bridge.ts'
+import { formatBatch, injectBatch, mergeIntoDraft, type ComposerPort } from './inject.ts'
 import { DEFAULT_PORT, PROTOCOL_VERSION, type AnnotationBatch } from './protocol.ts'
+import { createPairingRouteHandler } from './client/pairing-route.ts'
+import { createInjectionRelay } from './client/injection-relay.ts'
+import { ROUTE_PREFIX } from './client/pairing-contract.ts'
 
 /** Plugin identity for `cordis.patch.yml` rows. Must match the row's `id`. */
 export const name = 'dsh-annotate'
@@ -32,7 +41,7 @@ export const name = 'dsh-annotate'
  * needs nothing from DSH. Later workstreams (conversation injection) will add
  * `sessions` here.
  */
-export const inject = ['tools']
+export const inject = ['tools', 'webServer']
 
 /** Plugin config, validated by the cordis Loader when a row supplies a value. */
 export interface AnnotateConfig {
@@ -132,20 +141,83 @@ export function apply(ctx: Context, config?: AnnotateConfig): void {
     : { info: () => {}, warn: () => {}, error: () => {} }
 
   /**
-   * Batch sink.
+   * The composer seam, backed by this plugin's own host->client crossing.
    *
-   * TODO(conversation-injection): hand `batch` to the renderer that produces the
-   * `🎯 界面标注` text block and injects it into the session composer without
-   * sending it. Until that module exists, resolving is the honest behaviour:
-   * the batch genuinely arrived and passed validation, and rejecting would make
-   * the extension believe its delivery failed and retry.
+   * DSH has no host-side API for writing a composer draft: the draft belongs to
+   * the browser client, whose only supported write is its own `setDraft(text)`,
+   * while every host-side alternative *sends* (queueing a turn, steering a
+   * running one), which this plugin must never do on the user's behalf. The
+   * framework's host->client event channel is a fixed allowlist a plugin cannot
+   * join, so the crossing is this plugin's own: the host parks the rendered
+   * block on its own HTTP route (`client/pairing-route.ts`), and this plugin's
+   * browser half claims it, calls `setDraft`, and acknowledges.
+   *
+   * The port below is the host END of that crossing, and it is honest about what
+   * the host can see:
+   *
+   * - `isAvailable` is always false. The host genuinely cannot observe whether a
+   *   composer is reachable, so claiming otherwise would make it report a
+   *   delivery it never saw. A false here does not lose the batch — it routes
+   *   `injectBatch` into the parked-log branch below, which renders the text and
+   *   hands it to the relay.
+   * - `readDraft` is undefined for the same reason: the host has no view of the
+   *   user's in-progress text, and returning `''` would let it "merge" against a
+   *   draft it invented.
+   * - The merge happens on the browser side, against the real draft, through the
+   *   same `mergeIntoDraft` the renderer already uses.
+   *
+   * When no browser half is running (a headless DSH, or the GUI simply never
+   * opened) the relay still fills and the batch still resolves, so the extension
+   * is never told its annotations were lost; the block waits in the mailbox and
+   * is delivered if a page claims it in time.
+   */
+  const relay = createInjectionRelay({
+    log: (message: string) => { ctx.logger?.info(message) },
+  })
+  const composerPort: ComposerPort | undefined = relay.port
+
+  /**
+   * Batch sink: render the batch, then offer it to the session's composer.
+   *
+   * Resolving is the honest outcome even when the batch could not be delivered,
+   * for the reason above — the batch genuinely arrived and passed validation,
+   * and the loss is ours to report in the log rather than the extension's to
+   * retry.
+   *
+   * The two branches are the two halves of the crossing. `result.ok` only
+   * happens when a port could actually see a composer, which the host-side port
+   * never can; the second branch is therefore the normal path: the rendered text
+   * is parked for the browser half, and the log line says so. The text is logged
+   * either way, so the feature is diagnosable from a log alone.
    */
   const onSubmit = async (batch: AnnotationBatch): Promise<void> => {
     ctx.logger?.info(
       `[dsh-annotate] received batch ${batch.batchId}: ${batch.annotations.length} annotation(s) from ${batch.page.url}`,
     )
-    // TODO(conversation-injection): await injectBatch(ctx, batch)
-    await Promise.resolve()
+
+    const result = injectBatch(batch.sessionId, batch, composerPort)
+    if (result.ok) {
+      ctx.logger?.info(
+        `[dsh-annotate] injected batch ${batch.batchId} into the composer for session ${result.sessionId}`,
+      )
+      return
+    }
+
+    // Park the block for the browser half. The session is required: a batch that
+    // names no session cannot be routed to a composer, and guessing one would
+    // put page facts into a conversation that has no context for them.
+    if (batch.sessionId !== undefined && batch.sessionId !== '') {
+      const text = formatBatch(batch)
+      const merged = mergeIntoDraft('', text)
+      composerPort?.setDraft(batch.sessionId, merged.text)
+      ctx.logger?.info(
+        `[dsh-annotate] batch ${batch.batchId} parked for the browser half (${result.reason}): ${result.detail}`,
+      )
+    } else {
+      ctx.logger?.info(`[dsh-annotate] batch ${batch.batchId} was not injected (${result.reason}): ${result.detail}`)
+    }
+
+    if (resolved.log) ctx.logger?.info(`[dsh-annotate] rendered block:\n${formatBatch(batch)}`)
   }
 
   const bridge = new BridgeServer({
@@ -170,6 +242,38 @@ export function apply(ctx: Context, config?: AnnotateConfig): void {
       void bridge.stop().catch(() => { /* teardown is best-effort by definition */ })
     }
   }, 'dsh-annotate: loopback bridge')
+
+  /**
+   * Pairing routes: how the user reads the bearer token to type into the
+   * extension, how the settings section learns whether the extension is up, and
+   * how this plugin's browser half collects the annotation blocks the host
+   * parked for it.
+   *
+   * A prefix registration rather than an index injection, deliberately. The
+   * index-injection channel inlines its value into `index.html`, which would
+   * hand the token to anything that can load the page; a route is only readable
+   * by a caller that already clears DSH's own browser-trust fence.
+   *
+   * The injection members are wired here rather than inside the handler because
+   * the relay is the host's own state: the handler is the transport, the relay
+   * is the mailbox, and keeping them separate is what lets the handler be tested
+   * against a stub mailbox.
+   */
+  ctx.effect(
+    () =>
+      ctx.webServer.register({
+        kind: 'prefix',
+        path: ROUTE_PREFIX,
+        handler: createPairingRouteHandler({
+          status: () => bridge.status(),
+          token: () => bridge.getToken(),
+          takeInjections: () => relay.takePending(),
+          acknowledgeInjections: (ids: readonly string[]) => relay.acknowledge(ids),
+          log: (message: string) => { ctx.logger?.info(message) },
+        }),
+      }),
+    'dsh-annotate: pairing routes',
+  )
 
   /**
    * `annotate_status`: the model's only window onto bridge state.

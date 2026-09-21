@@ -10,7 +10,8 @@
     "tabs",
     "activeTab",
     "scripting",
-    "webNavigation"
+    "webNavigation",
+    "alarms"
   ],
 
   "host_permissions": [
@@ -30,6 +31,10 @@
       "16": "assets/icon16.png",
       "32": "assets/icon32.png"
     }
+  },
+
+  "side_panel": {
+    "default_path": "panel/index.html"
   },
 
   "content_scripts": [
