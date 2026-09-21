@@ -288,3 +288,44 @@ test('the host half declares only services DSH actually provides', { skip: check
     )
   }
 })
+
+test('every privileged extension API used is declared in the manifest', { skip: !built }, () => {
+  // Chrome refuses a call whose permission is undeclared by throwing. The throw
+  // happens at run time, in a service worker nobody is watching, so the symptom
+  // is a button that does nothing rather than an error anyone sees — which is
+  // exactly how `sidePanel.open` shipped without the `sidePanel` permission.
+  //
+  // The map is deliberately explicit rather than derived: there is no reliable
+  // way to extract API usage from a bundle, and a hand-written table that fails
+  // loudly when a new API appears is worth more than a clever check that
+  // silently covers less than it appears to.
+  const REQUIRED_PERMISSION = [
+    { pattern: /\bchrome\.sidePanel\b/, permission: 'sidePanel' },
+    { pattern: /\bchrome\.scripting\b/, permission: 'scripting' },
+    { pattern: /\bchrome\.alarms\b/, permission: 'alarms' },
+    { pattern: /\bchrome\.webNavigation\b/, permission: 'webNavigation' },
+  ]
+
+  // Only the worker can call a privileged API expecting a permission; the
+  // content script runs with the page's own privileges and the panel is an
+  // ordinary extension page.
+  const worker = readFileSync(join(packageRoot, 'extension', 'background.js'), 'utf8')
+  // The extension's manifest, not the npm one: the two are different documents
+  // and only this one carries `permissions`.
+  const extensionManifest = JSON.parse(
+    readFileSync(join(packageRoot, 'extension', 'manifest.json'), 'utf8'),
+  )
+  const declared = new Set(extensionManifest.permissions ?? [])
+
+  const missing = REQUIRED_PERMISSION
+    .filter(({ pattern }) => pattern.test(worker))
+    .filter(({ permission }) => !declared.has(permission))
+    .map(({ permission }) => permission)
+
+  assert.deepEqual(
+    missing,
+    [],
+    `the worker calls APIs whose permissions the manifest does not declare: ${missing.join(', ')}. `
+    + 'Chrome throws at the call site, so the symptom is a silent no-op.',
+  )
+})

@@ -11,7 +11,8 @@
     "activeTab",
     "scripting",
     "webNavigation",
-    "alarms"
+    "alarms",
+    "sidePanel"
   ],
 
   "host_permissions": [
