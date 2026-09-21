@@ -885,18 +885,32 @@ chrome.storage.onChanged.addListener((changes, area) => {
 })
 
 chrome.action.onClicked.addListener((tab) => {
+  // Opening the panel is the button's primary job, and it has to happen
+  // synchronously: `sidePanel.open` is only permitted while a user gesture is
+  // still active, so awaiting anything first — a status read, a config reload —
+  // makes the call fail and the panel silently never appears. Everything that
+  // needs to be asynchronous therefore starts after this call, not before it.
+  const windowId = tab.windowId
+  const opened = windowId === undefined
+    ? chrome.sidePanel.open(tab.id === undefined ? {} : { tabId: tab.id })
+    : chrome.sidePanel.open({ windowId })
+  void opened.catch((error: unknown) => {
+    // A window that closed between the click and the call is ordinary; a
+    // rejected gesture is not, and saying so is the only way it gets noticed.
+    report('warn', `[dsh-annotate] could not open the side panel: ${String(error)}`)
+  })
+
   void (async () => {
     if (tab.id === undefined) return
+    // The toolbar button also toggles picking, which is why the badge shows
+    // connection state: a connected extension means the click arms the picker
+    // in this tab. The panel above is what makes the click visible, so this
+    // part stays best-effort.
     if (client.isConnected()) {
-      // The toolbar button is the user's toggle: connected means "put the
-      // picker in this tab", and pressing it again takes the picker away.
       await startPickingInTab(tab.id, client)
       await refreshBadge(tab.id)
       return
     }
-    // Not connected is the one case where the user needs words rather than a
-    // toggle, and the badge cannot carry a sentence. The status is already in
-    // storage for the settings page; this makes the reason visible immediately.
     const status = await readStatus()
     report('warn', `[dsh-annotate] ${describeStatus(status)}`)
     await refreshBadge(tab.id)
