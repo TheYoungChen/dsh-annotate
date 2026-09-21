@@ -92,9 +92,17 @@ class Overlay {
   private readonly label: HTMLDivElement
   private readonly hint: HTMLDivElement
 
-  constructor(hintText: string) {
+  /**
+   * @param hintText - text of the hint strip, or empty for a marker, which is
+   *   a momentary pointer and would be wrong to advertise exiting on.
+   * @param kind - recorded as a data attribute so a later session can tell a
+   *   leftover marker from a leftover session overlay and clean up only the
+   *   right one.
+   */
+  constructor(hintText: string, kind: 'session' | 'marker') {
     this.host = document.createElement('div')
     this.host.id = OVERLAY_HOST_ID
+    this.host.setAttribute('data-dsh-annotate-kind', kind)
     // The host itself must never affect layout: positioned fixed so it is out of
     // flow, zero-sized so it cannot shift content, and transparent to pointers
     // so the page keeps receiving mousemove underneath our boxes.
@@ -115,6 +123,7 @@ class Overlay {
     this.hint = document.createElement('div')
     this.hint.setAttribute('style', HINT_STYLE)
     this.hint.textContent = hintText
+    this.hint.hidden = hintText === ''
 
     this.shadow.append(this.highlight, this.label, this.hint)
     document.documentElement.append(this.host)
@@ -383,7 +392,11 @@ export const elementRegistry = new ElementRegistry()
  */
 export function startPicking(options: PickerOptions): PickerSession {
   const { onHover, onPick, onExit, keepAlive = false, hintText = DEFAULT_HINT } = options
-  const overlay = new Overlay(hintText)
+  // A previous session on this frame may have been stopped without its overlay
+  // going away (a torn-down content script, a thrown handler). Removing any
+  // leftover session host here keeps the frame to exactly one highlight layer.
+  clearStaleOverlay('session')
+  const overlay = new Overlay(hintText, 'session')
 
   let current: Element | null = null
   let active = true
@@ -394,8 +407,6 @@ export function startPicking(options: PickerOptions): PickerSession {
   let cycleIndex = 0
   /** Coalesces mousemove into one hit-test per frame. */
   let frame = 0
-  /** Set while a pick is being delivered, so exit handlers cannot re-enter. */
-  let stopped = false
 
   const eventFor = (target: Element): PickerEvent => {
     const box = target.getBoundingClientRect()
@@ -437,10 +448,9 @@ export function startPicking(options: PickerOptions): PickerSession {
     document.removeEventListener('keyup', onKeyUp, true)
     window.removeEventListener('scroll', onViewportChange, true)
     window.removeEventListener('resize', onViewportChange, true)
-    // The marker is deliberately not cleared here: a marker is drawn by a
-    // caller that asked for it and outlives the session, while the highlight is
-    // ours and must go. `disarmPicking` clears it when the mode is torn down.
-    if (!stopped) onExit?.(reason)
+    // Reported last, and only once: `active` is already false, so an exit
+    // handler that calls `stop` again returns at the top instead of looping.
+    onExit?.(reason)
   }
 
   // -- addressing already-picked elements ---------------------------------
@@ -510,12 +520,9 @@ export function startPicking(options: PickerOptions): PickerSession {
     const delivered = eventFor(target)
     // Stop before notifying: the handler for the pick may open the comment
     // panel, and the panel must not be covered by a highlight layer that is
-    // still tracking the pointer.
-    if (!keepAlive) {
-      stopped = true
-      stop('picked')
-      stopped = false
-    }
+    // still tracking the pointer. `stop` reports the exit itself, so the pick
+    // handler runs after the session has already been torn down.
+    if (!keepAlive) stop('picked')
     onPick(delivered)
   }
 
@@ -627,10 +634,16 @@ export function startPicking(options: PickerOptions): PickerSession {
  *
  * @returns true when a stale overlay was found and removed.
  */
-export function clearStaleOverlay(): boolean {
-  const stale = document.getElementById(OVERLAY_HOST_ID)
-  if (stale === null) return false
-  stale.remove()
+export function clearStaleOverlay(kind: 'session' | 'marker' | 'any' = 'any'): boolean {
+  // Queried by kind rather than id: a marker and a session overlay share the
+  // host id, so an id lookup could return the wrong one and leave a duplicate
+  // box on screen.
+  const selector = kind === 'any'
+    ? `#${OVERLAY_HOST_ID}`
+    : `#${OVERLAY_HOST_ID}[data-dsh-annotate-kind="${kind}"]`
+  const stale = document.querySelectorAll(selector)
+  if (stale.length === 0) return false
+  for (const host of stale) host.remove()
   return true
 }
 
@@ -654,7 +667,9 @@ type PickerGlobal = typeof globalThis & {
  */
 export function armPicking(options: PickerOptions): PickerSession {
   disarmPicking('disabled')
-  clearStaleOverlay()
+  // Markers are cleared as well: they share the host id, and a marker left over
+  // from a previous session would be counted as a second highlight layer.
+  clearStaleOverlay('any')
   const session = startPicking(options)
   ;(globalThis as PickerGlobal)[SESSION_SLOT] = session
   return session
@@ -690,7 +705,7 @@ export function flashElement(id: string): boolean {
   if (element === null) return false
   const box = element.getBoundingClientRect()
   if (!isInViewport(box)) element.scrollIntoView({ block: 'center', inline: 'nearest' })
-  const overlay = new Overlay('')
+  const overlay = new Overlay('', 'marker')
   overlay.render(element, element.getBoundingClientRect())
   // Self-removing: a marker is a momentary signal, and a timer keeps the caller
   // from having to remember to clear it when the pointer leaves a list row.

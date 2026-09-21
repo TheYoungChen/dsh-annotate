@@ -1343,24 +1343,46 @@ function buildSelector(el: Element): SelectorResult {
 
   const id = el.getAttribute('id')
   if (id !== null && isSafeIdToken(id)) {
-    const candidate = `${scope}#${escapeIdentifier(id)}`
-    if (matchesOnly(root, candidate, el)) return { selector: candidate, matches: 1 }
+    const unique = verified(root, `${scope}#${escapeIdentifier(id)}`, el)
+    if (unique !== null) return unique
   }
 
   for (const attribute of TEST_ID_ATTRIBUTES) {
     const value = el.getAttribute(attribute)
     if (value === null || value === '') continue
-    const candidate = `${scope}${escapeIdentifier(safeTagOf(el))}[${attribute}="${escapeAttributeValue(value)}"]`
-    if (matchesOnly(root, candidate, el)) return { selector: candidate, matches: 1 }
+    const unique = verified(root, `${scope}${safeTagOf(el)}[${attribute}="${escapeAttributeValue(value)}"]`, el)
+    if (unique !== null) return unique
   }
 
   const tokens = safeClassTokens(el)
   const classCandidate = `${safeTagOf(el)}${tokens.map((name) => `.${escapeIdentifier(name)}`).join('')}`
   if (tokens.length > 0 && classCandidate.length <= MAX_CLASS_SELECTOR_LENGTH) {
-    const candidate = `${scope}${classCandidate}`
-    if (matchesOnly(root, candidate, el)) return { selector: candidate, matches: 1 }
+    const unique = verified(root, `${scope}${classCandidate}`, el)
+    if (unique !== null) return unique
   }
 
+  return structuralSelector(el, scope, root)
+}
+
+/** A candidate selector, but only if it resolves to exactly this element. */
+function verified(root: Document | ShadowRoot, selector: string, el: Element): SelectorResult | null {
+  return matchesOnly(root, selector, el) ? { selector, matches: 1 } : null
+}
+
+/**
+ * The structural fallback: a rooted `nth-of-type` path, with its live match
+ * count.
+ *
+ * This is deliberately a separate step rather than a final line inside
+ * {@link buildSelector}. Each candidate above is tested by running it, and
+ * running a selector can throw — an id the page mutated between the read and
+ * the query, a class the page set to something unparsable. When that throw
+ * escaped `buildSelector`, the whole function unwound and the fallback never
+ * ran, so a page with a hostile id produced an empty selector instead of the
+ * verbose one that would have worked. Keeping the fallback outside the candidate
+ * chain means no earlier failure can take it down with it.
+ */
+function structuralSelector(el: Element, scope: string, root: Document | ShadowRoot): SelectorResult {
   const path = `${scope}${structuralPath(el)}`
   return { selector: path, matches: countMatches(root, path) }
 }
@@ -1406,15 +1428,21 @@ function structuralPath(el: Element): string {
   while (node !== null && hops < MAX_ANCESTRY_HOPS) {
     hops += 1
     const parent = parentOf(node)
-    const anchor = parent === null ? null : parent.getAttribute('id')
-    if (parent !== null && anchor !== null && isSafeIdToken(anchor)) {
-      segments.unshift(`#${escapeIdentifier(anchor)}`)
-      break
-    }
+    // The element's own segment is emitted first, and only then is the anchor
+    // considered. Checking the anchor first would end the walk on the element's
+    // own parent — producing `#host` for a `<span>` inside `#host`, a selector
+    // that resolves to the wrong element while looking perfectly valid.
     segments.unshift(segmentFor(node, parent))
     if (parent === null) break
     if (parent.tagName.toLowerCase() === 'html') {
       segments.unshift('html')
+      break
+    }
+    const anchor = parent.getAttribute('id')
+    if (anchor !== null && isSafeIdToken(anchor)) {
+      // An id pins the position absolutely, so walking further would only add
+      // path segments that make the selector more fragile.
+      segments.unshift(`#${escapeIdentifier(anchor)}`)
       break
     }
     node = parent
