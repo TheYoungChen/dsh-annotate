@@ -40,9 +40,12 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-renderer",
-        "@deepseek-ai/dsh-client-ui-settings"
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "external": [
+        "react",
+        "react/jsx-runtime"
       ]
     },
     "compatibility": {
@@ -76,7 +79,7 @@
     "link": "node ./scripts/link-dsh.mjs",
     "build": "npm run build:dsh && npm run build:extension",
     "build:dsh": "node ./scripts/build-dsh.mjs",
-    "build:extension": "node ./scripts/build.mjs",
+    "build:extension": "node ./scripts/make-icons.mjs && node ./scripts/build.mjs",
     "check": "tsc --noEmit -p tsconfig.json",
     "check:extension": "tsc --noEmit -p tsconfig.extension.json",
     "check:tests": "tsc --noEmit -p tsconfig.test.json",

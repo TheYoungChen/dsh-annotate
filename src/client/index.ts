@@ -52,6 +52,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /**
+ * The plugin's id on the client side.
+ *
+ * The loader writes this name onto the module it registers, and the host's
+ * client-entry graph is keyed by it, so omitting it leaves the row unidentified:
+ * the bundle loads, its factory runs, and nothing it contributes is ever
+ * attributed to a plugin. Matches `name` in `src/index.ts`.
+ */
+export const name = 'dsh-annotate'
+
+/**
  * Services required before this half mounts.
  *
  * `slots` is the composition registry and `locale` backs the section's copy.

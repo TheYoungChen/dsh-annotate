@@ -96,11 +96,40 @@ const EXTERNAL = [
 /**
  * The two bundles to emit.
  *
- * `platform` and `format` are fixed per half rather than inferred: the host is
- * a Node process loading ESM, and the client is loaded by the browser bundle,
- * also as ESM. There is nothing here that a manifest could decide, so nothing
- * is read from one.
+ * ## The host half is plain Node ESM
+ *
+ * DSH imports it in its own process, so it is an ordinary ES module and its
+ * `@deepseek-ai/*` imports resolve normally through Node.
+ *
+ * ## The client half is a factory, and that is not a style choice
+ *
+ * A client bundle is **not** loaded as an ES module. The browser has no import
+ * map for this server's packages, so a bundle containing `import "react"` fails
+ * to parse and takes the whole composed bundle request down with it — every
+ * other plugin's client code fails alongside it. That is exactly the failure
+ * this file used to cause.
+ *
+ * DSH's contract is instead a factory registered on a loader global:
+ *
+ * ```js
+ * window.__ModuleLoader__.load({
+ *   id: 'dsh-annotate',
+ *   factory: (require) => { ... return module.exports },
+ * })
+ * ```
+ *
+ * Everything the factory needs — React, the DSH client packages — is obtained
+ * by calling `require` **at run time**, which the loader resolves against its
+ * own table. So the bundle is emitted as CommonJS wrapped in that registration,
+ * with every bare specifier left as a `require` call rather than bundled in.
+ *
+ * The `dsh.client.inject` list in `package.json` names the DSH packages the
+ * factory requires. It is the dependency declaration for that table: the loader
+ * uses it to order factories so a dependency's exports exist before its
+ * consumer's factory runs.
  */
+const CLIENT_GLOBAL = '__ModuleLoader__'
+
 const TARGETS = [
   {
     name: 'host',
@@ -116,9 +145,55 @@ const TARGETS = [
     out: join(libDir, 'client.js'),
     platform: 'browser',
     target: 'chrome116',
-    format: 'esm',
+    format: 'cjs',
+    // Modules the factory requires instead of bundling. Unlike the host half,
+    // this list is not "everything external" — it is what the loader can
+    // resolve. Anything else must be bundled or the factory throws at run time.
+    external: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react-dom/client',
+      '@deepseek-ai/',
+    ],
+    wrapper: { id: 'dsh-annotate', global: CLIENT_GLOBAL },
   },
 ]
+
+/**
+ * Wrap a CommonJS bundle in the loader registration DSH expects.
+ *
+ * The wrapper is applied as a banner and a footer rather than by post-processing
+ * the output, so esbuild's source map still lines up: the banner is prepended
+ * with a fixed line count and the footer appended, and the map's own line
+ * offsets are relative to the body either way.
+ *
+ * `--banner:js` and `--footer:js` are inserted verbatim, so the body's own
+ * `"use strict"` and top-level `require` calls stay where CommonJS expects
+ * them — inside the factory function, where `require` is the loader's own.
+ *
+ * @param step - the target being built.
+ * @returns the banner and footer text.
+ */
+function wrapperFor(step) {
+  if (step.wrapper === undefined) return { banner: undefined, footer: undefined }
+  const { id, global } = step.wrapper
+  return {
+    banner: [
+      `window.${global}.load({`,
+      `  id: ${JSON.stringify(id)},`,
+      '  factory: (require) => {',
+      '    var module = { exports: {} };',
+      '    var exports = module.exports;',
+      '    Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });',
+    ].join('\n'),
+    footer: [
+      '    return module.exports;',
+      '  },',
+      '});',
+    ].join('\n'),
+  }
+}
 
 /**
  * Run one bundle step.
@@ -142,7 +217,17 @@ function runEsbuild(esbuild, step) {
     // a dependency the code does not actually use at run time.
     `--outfile=${step.out}`,
   ]
-  for (const name of EXTERNAL) args.push(`--external:${name}`)
+
+  // The host half externalises every DSH package because Node resolves them
+  // from `node_modules`. The client half externalises only what the loader's
+  // own table can answer — see `TARGETS`. A client bundle that externalised
+  // everything would leave `require` calls the loader cannot resolve, which
+  // fails at run time rather than at build time.
+  for (const name of step.external ?? EXTERNAL) args.push(`--external:${name}`)
+
+  const { banner, footer } = wrapperFor(step)
+  if (banner !== undefined) args.push(`--banner:js=${banner}`)
+  if (footer !== undefined) args.push(`--footer:js=${footer}`)
 
   const result = spawnSync(esbuild, args, {
     cwd: packageRoot,

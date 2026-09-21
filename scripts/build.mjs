@@ -360,6 +360,11 @@ function declaredAssets(manifest, htmlSource) {
     // manifest declaring it is a packaging concern, and failing here would make
     // a source checkout unbuildable over a binary that is not in the tree.
     if (!existsSync(from)) continue
+    // `make-icons.mjs` writes the icons straight to their declared location —
+    // they are generated, not hand-drawn, so there is no source copy sitting
+    // somewhere else to move. When the two paths already coincide there is
+    // nothing to do, and reporting a copy of a file onto itself would be noise.
+    if (resolve(from) === resolve(join(extensionDir, declared))) continue
     if (seen.has(declared)) continue
     seen.add(declared)
     assets.push({ from, to: declared, label: `icon ${declared}` })
