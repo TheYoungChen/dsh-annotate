@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output — the repository ships source, not artifacts
+lib/
+dist/
+extension/**/*.js
+build/
+*.tsbuildinfo
+
+# Local environment
+.env
+.env.local
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*

@@ -1,0 +1,62 @@
+{
+  "name": "dsh-annotate",
+  "version": "0.1.0",
+  "description": "Annotate any web element - local or online - with DOM facts and your comments, straight into your DeepSeek Harness chat.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "deepseek",
+    "dsh",
+    "annotation",
+    "element-inspector",
+    "browser-extension",
+    "dom"
+  ],
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "extension",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    },
+    "compatibility": {
+      "dsh": ">=0.1.5-rc.1"
+    }
+  },
+  "engines": {
+    "node": "^22.19 || >=24"
+  },
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "check": "tsc --noEmit",
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheYoungChen/dsh-annotate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TheYoungChen/dsh-annotate/issues"
+  },
+  "homepage": "https://github.com/TheYoungChen/dsh-annotate#readme"
+}
