@@ -70,6 +70,37 @@ function dshCheckout() {
 const checkout = dshCheckout()
 
 /**
+ * Assert that an `inject` list names services the way Cordis reads them.
+ *
+ * `inject` is a list of service names to wait for before activating. Cordis
+ * interpolates each entry into the boot error it raises when the wait does not
+ * end, so an entry that is not a string is reported as `[object Object]` — and
+ * a service by that name does not exist, so the wait never ends. The plugin
+ * stays `pending` forever and the only symptom is a boot message that names
+ * nothing actionable.
+ *
+ * This is an easy mistake to make, because the mistake looks like a feature: a
+ * `{ name: undefined }` entry reads as "optional dependency" and is in fact
+ * "wait for a service called [object Object]". An optional dependency belongs in
+ * the code that uses it, resolved by name at run time.
+ *
+ * @param inject - the value exported as `inject`.
+ * @param half - which half this is, for the failure message.
+ */
+function assertInjectNamesAreStrings(inject, half) {
+  assert.ok(Array.isArray(inject), `${half} must export an inject array`)
+  for (const entry of inject) {
+    assert.equal(
+      typeof entry,
+      'string',
+      `${half} inject contains ${JSON.stringify(entry)}; every entry must be a service name, `
+      + 'or Cordis waits forever for a service called [object Object]',
+    )
+    assert.notEqual(entry, '', `${half} inject contains an empty service name`)
+  }
+}
+
+/**
  * The platform seed, as DSH's `seed.ts` builds it.
  *
  * These are the only specifiers the loader answers from a shell-static import.
@@ -101,7 +132,7 @@ test('the host half exposes the four things Cordis reads', { skip: !built }, asy
   assert.equal(typeof mod.name, 'string', 'name must be a string')
   assert.equal(mod.name, manifest.name, 'name must match the package name')
   assert.equal(typeof mod.apply, 'function', 'apply must be callable')
-  assert.ok(Array.isArray(mod.inject), 'inject must be an array')
+  assertInjectNamesAreStrings(mod.inject, 'the host half')
 })
 
 test('the client half registers a factory rather than being an ES module', { skip: !built }, () => {
@@ -171,7 +202,7 @@ test('the client factory runs, and only asks for specifiers the loader answers',
 
     assert.equal(typeof exports.apply, 'function', 'the factory must return a plugin body')
     assert.equal(exports.name, manifest.name, 'the factory must return the plugin id')
-    assert.ok(Array.isArray(exports.inject), 'the factory must return an inject list')
+    assertInjectNamesAreStrings(exports.inject, 'the client half')
 
     // Every specifier the factory asked for resolved, or the call above threw.
     // Recording them makes a future failure name the specifier directly.

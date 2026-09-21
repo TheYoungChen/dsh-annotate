@@ -62,24 +62,35 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const name = 'dsh-annotate'
 
 /**
- * Services required before this half mounts.
+ * Services that must exist before this half mounts.
  *
- * `slots` is the composition registry and `locale` backs the section's copy.
  * Both are client-runtime services this plugin only consumes; it provides none
  * of its own, so no other package can end up depending on this one.
  *
- * `conversation` is declared because this half is also the only code in the
- * plugin that can reach a composer: the host cannot write a draft, so the
- * annotation blocks it accepts have to be typed in from here. Cordis reads a
- * key whose config is `undefined` as optional
- * (`Inject.resolve` → `{}[name] ?? null` → null → skipped), so a deployment that
- * composes this client half without the conversation packages still mounts: the
- * injection loop simply never starts, and the host keeps declining batches the
- * way it always did. The same is true of the runtime services this half reads by
- * name — a name that is NOT in this list resolves to `undefined` on the context
- * proxy, while a name that IS listed and missing would throw instead.
+ * - `slots` is the composition registry the Settings section registers into.
+ * - `locale` backs the section's copy.
+ *
+ * ## Why the conversation service is not listed here
+ *
+ * This half is the only code in the plugin that can reach a composer, so it
+ * needs the conversation service — but *optionally*. A deployment may compose
+ * this client half without the conversation packages, and that has to be an
+ * ordinary outcome rather than a failed mount: the Settings section still works
+ * and only the injection loop stays inactive.
+ *
+ * An entry in `inject` means "wait for this before activating", which is the
+ * opposite of optional. Listing a service that is not there leaves the whole
+ * plugin `pending` forever, and DSH reports it at boot as
+ * `waiting for service`. `composer-port.ts` therefore resolves the conversation
+ * service by name at run time (`ctx.get('conversation')`) and validates what it
+ * gets back, so absence is handled where it occurs instead of blocking
+ * activation.
+ *
+ * Every entry must also be a plain string: Cordis reads each one as a service
+ * name, so an object in this array is interpolated into the boot error as
+ * `[object Object]` and can never be satisfied.
  */
-export const inject = ['slots', 'locale', { conversation: undefined }]
+export const inject = ['slots', 'locale']
 
 /**
  * Client plugin body: register this plugin's dictionaries and its one Settings
