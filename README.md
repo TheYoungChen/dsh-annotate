@@ -187,9 +187,29 @@ node scripts/smoke-proxy.mjs
 
 ## 文档
 
+- `docs/compatibility.md` —— DSH 版本兼容声明、依据，以及尚未完成的运行验收步骤
 - `docs/design-principles.md` —— 设计原则
 - `docs/reference-element-facts.ts` —— 元素信息采集参考实现（ARIA role 映射等），
   当前版本未启用，保留供将来扩展
+
+## 兼容性
+
+| DSH 版本 | 状态 |
+|---|---|
+| `0.1.7-alpha.1` | 兼容 |
+| `0.1.7-alpha.2` | 兼容 |
+| `0.1.7-rc.1` | 兼容 |
+
+Node.js `>=20`；平台 `win32` / `darwin` / `linux`；Profile `web`。
+
+兼容性声明的依据是 API 表面检查，可复现：
+
+```bash
+node scripts/check-compat.mjs 0.1.7-rc.1
+```
+
+它验证插件用到的服务与槽位在该版本中确实存在。**这不等同于运行验收** ——
+一次性 Profile 的安装/启动/卸载证据尚未采集，`docs/compatibility.md` 记录了具体步骤。
 
 ## License
 
