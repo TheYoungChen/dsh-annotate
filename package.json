@@ -1,37 +1,39 @@
 {
   "name": "dsh-annotate",
   "version": "0.1.0",
-  "description": "Annotate any web element - local or online - with DOM facts and your comments, straight into your DeepSeek Harness chat.",
+  "description": "Annotate and comment on any web element in a live preview inside the DSH sidebar, then send it to the conversation as one structured block.",
   "type": "module",
   "license": "MIT",
-  "keywords": [
-    "dsh-plugin",
-    "deepseek-harness",
-    "deepseek",
-    "dsh",
-    "annotation",
-    "element-inspector",
-    "browser-extension",
-    "dom"
-  ],
   "main": "lib/index.js",
+  "author": "TheYoungChen",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheYoungChen/dsh-annotate.git"
+  },
+  "homepage": "https://github.com/TheYoungChen/dsh-annotate#readme",
+  "bugs": {
+    "url": "https://github.com/TheYoungChen/dsh-annotate/issues"
+  },
   "exports": {
-    ".": {
-      "default": "./lib/index.js"
-    },
-    "./client": {
-      "types": "./lib/types/client/index.d.ts",
-      "default": "./lib/client.js"
-    },
+    ".": "./lib/index.js",
+    "./client": "./client.js",
     "./package.json": "./package.json"
   },
   "files": [
     "lib",
-    "extension",
+    "client.js",
     "cordis.patch.yml",
     "README.md",
-    "README.en.md",
     "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "annotate",
+    "annotation",
+    "review",
+    "devtools"
   ],
   "dsh": {
     "bundle": {
@@ -40,58 +42,19 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-client-locale"
-      ],
-      "external": [
-        "react",
-        "react/jsx-runtime"
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
       ]
-    },
-    "compatibility": {
-      "dsh": ">=0.1.5-rc.1"
     }
   },
-  "engines": {
-    "node": "^22.19 || >=24"
-  },
-  "dependencies": {
-    "ws": "^8.18.0"
-  },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "*",
-    "@deepseek-ai/dsh-tools": "*",
-    "@deepseek-ai/dsh-llm": "*",
-    "@deepseek-ai/dsh-host-webserver": "*"
+    "@deepseek-ai/cordis": "*"
   },
   "peerDependenciesMeta": {
-    "@deepseek-ai/cordis": { "optional": true },
-    "@deepseek-ai/dsh-tools": { "optional": true },
-    "@deepseek-ai/dsh-llm": { "optional": true },
-    "@deepseek-ai/dsh-host-webserver": { "optional": true }
+    "@deepseek-ai/cordis": { "optional": true }
   },
-  "devDependencies": {
-    "@types/node": "^22.10.0",
-    "@types/ws": "^8.5.13",
-    "typescript": "^5.9.0"
+  "engines": {
+    "node": ">=20"
   },
-  "scripts": {
-    "link": "node ./scripts/link-dsh.mjs",
-    "build": "npm run build:dsh && npm run build:extension",
-    "build:dsh": "node ./scripts/build-dsh.mjs",
-    "build:extension": "node ./scripts/make-icons.mjs && node ./scripts/build.mjs",
-    "check": "tsc --noEmit -p tsconfig.json",
-    "check:extension": "tsc --noEmit -p tsconfig.extension.json",
-    "check:tests": "tsc --noEmit -p tsconfig.test.json",
-    "test": "node --experimental-strip-types --test \"tests/*.test.ts\" \"tests/*.spec.ts\"",
-    "verify": "npm run check && npm run test"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/TheYoungChen/dsh-annotate.git"
-  },
-  "bugs": {
-    "url": "https://github.com/TheYoungChen/dsh-annotate/issues"
-  },
-  "homepage": "https://github.com/TheYoungChen/dsh-annotate#readme"
+  "dshTarget": "0.1.5-rc.1"
 }

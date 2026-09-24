@@ -1,0 +1,4 @@
+# dsh-annotate bundle patch: mount the plugin row and its client half.
+- insert:
+    - id: dsh-annotate
+      name: dsh-annotate

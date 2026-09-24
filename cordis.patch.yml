@@ -1,4 +1,17 @@
-# dsh-annotate bundle patch: mount the plugin row and its client half.
+# dsh-annotate bundle patch: inserts the plugin into a profile's layer stack.
+#
+# The host half needs `webServer` to hang its proxy route off the harness
+# origin, plus `timer` for the preview idle sweep.
 - insert:
     - id: dsh-annotate
-      name: dsh-annotate
+      name: 'dsh-annotate'
+      config:
+        enabled: true
+        # Loopback targets only in this release. Online sites are a later
+        # phase and require SSRF hardening that is not wired up yet.
+        allowRemote: false
+        # Open a local page that lives outside the workspace. Only the named
+        # file and the assets beside it are served, so a page kept in a notes
+        # directory can be annotated without moving it into the workspace.
+        allowExternalFiles: true
+        idleMs: 300000

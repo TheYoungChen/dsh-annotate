@@ -1,38 +1,27 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 
-# Build output — the repository ships source, not artifacts
-lib/
+# Build output
 dist/
-build/
 *.tsbuildinfo
-
-# The extension is built into place, next to its manifest, because that is the
-# directory a browser loads as an unpacked extension. Everything the build
-# writes is derived from `extension/src`, so it is ignored here rather than
-# committed: the `extension/src` tree is the only copy that gets edited.
-#
-# The manifest is excluded from the ignore rules below on purpose — it is
-# hand-written source that happens to live at the extension root.
-extension/**/*.js
-extension/**/*.js.map
-extension/panel/
-!extension/manifest.json
-
-# Local environment
-.env
-.env.local
-
-# Editors and OS
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
 
 # Logs
 *.log
 npm-debug.log*
+pnpm-debug.log*
 
-# Commit-message scratch files
-CMSG.tmp
-.git/CMSG.txt
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local scratch
+tmp/
+.tmp/
+*.local
+
+# Test artefacts
+coverage/
+.nyc_output/
