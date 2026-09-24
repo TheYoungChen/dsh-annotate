@@ -25,3 +25,8 @@ tmp/
 # Test artefacts
 coverage/
 .nyc_output/
+
+# The superseded Chrome-extension implementation. It stays on the machines that
+# already have it, but it is not part of this repository: the parts of it still
+# worth reading live in docs/ (the element-fact collector and design notes).
+legacy/
