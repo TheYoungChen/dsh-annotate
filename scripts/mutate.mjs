@@ -212,6 +212,15 @@ const MUTATIONS = {
     from: "      post('unplaced', { count: unplaced.length, total: state.annotations.length, items: unplaced })",
     to: '      void unplaced',
   },
+  'path-ends-at-ancestor': {
+    // Building the positional path by returning an ancestor as the WHOLE selector.
+    // This is the reader's exact report: a `<b>` inside `.l2` recorded as `.l2`, which
+    // resolves uniquely to the container. Two annotations on different children then
+    // land on one node and a number is never drawn.
+    file: 'lib/overlay.js',
+    from: "      if (anchor) {\n        segments.unshift(anchor)\n        break\n      }",
+    to: "      if (anchor) {\n        return anchor\n      }",
+  },
 }
 
 const mutation = MUTATIONS[name]

@@ -320,6 +320,13 @@ const cases = [
     mutate: 'unplaced-annotations-silent',
     expect: /announced, not dropped|reported to the panel/i,
   },
+  {
+    // The reader's exact report, reproduced: a `<b>` inside `.l2` recorded as `.l2`.
+    name: 'the path ends at an ancestor instead of the element',
+    script: 'check-anchor-shape.mjs',
+    mutate: 'path-ends-at-ancestor',
+    expect: /resolves to the bold itself|does not resolve to \.l2/i,
+  },
 ]
 
 let good = 0

@@ -191,7 +191,7 @@ DSH 宿主
 ## 开发
 
 ```bash
-# 回归测试（28 项）
+# 回归测试（29 项）
 node scripts/preflight-activation.mjs   # 激活链（真实 composeEntries）
 node scripts/preflight-shapes.mjs       # 注册形状对真实 slot key 校验
 node scripts/preflight-profile.mjs      # profile 里恰好一行 annotate
@@ -220,12 +220,15 @@ node scripts/check-interaction.mjs      # Esc 退出标记；只有一个交接�
 node scripts/check-payload.mjs          # 客户端不再拼文本（交接边界守卫）
 node scripts/check-selector-target.mjs  # 选择器以目标元素结尾，不是它的祖先
 node scripts/check-duplicate-nodes.mjs  # 同结构节点上的两个标注不会解析到同一个元素
+node scripts/check-anchor-shape.mjs     # 复现读者页面的形状：两条路径各自锚定自己的元素
 
-# 变异检测：注入 34 个故障，每一个都必须被抓到
+# 变异检测：注入 35 个故障，每一个都必须被抓到
 node scripts/check-preflight-power.mjs
 
 # 对一个真实运行中的实例复查（默认 3099，先起好）
 node scripts/check-preview-inline.mjs http://127.0.0.1:3099
+# 直接问正在跑的那个进程（默认 3080）：它实际送出的是哪一版 overlay
+node scripts/check-live-host.mjs http://127.0.0.1:3080
 
 # 冒烟 / 诊断
 node scripts/smoke-host.mjs
