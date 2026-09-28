@@ -204,9 +204,15 @@ const clientApiPath = clientApi && clientApi[1]
 note(Boolean(clientApiPath), 'the client declares an API base', clientApiPath)
 note(clientApiPath === route, 'the client API base matches the host route', `${clientApiPath} vs ${route}`)
 
-// Every action the client calls must exist on the host.
+// Every action the client calls must exist on the host. Two forms count as an
+// implementation: a `case` arm of the dispatcher, and an early guard that
+// answers before the dispatcher is reached. The second form is used for actions
+// that carry no preview work, so that they are not gated on a workspace root.
 const called = [...clientSrc2.matchAll(/fetch\(`\$\{API\}\/([a-z]+)`/g)].map((m) => m[1])
-const implemented = [...hostSrc.matchAll(/case '([a-z]+)':/g)].map((m) => m[1])
+const implemented = [...new Set([
+  ...[...hostSrc.matchAll(/case '([a-z]+)':/g)].map((m) => m[1]),
+  ...[...hostSrc.matchAll(/action === '([a-z]+)'/g)].map((m) => m[1]),
+])]
 console.log(`  client calls: ${called.join(', ') || '(none)'}`)
 console.log(`  host implements: ${implemented.join(', ') || '(none)'}`)
 for (const action of called) {

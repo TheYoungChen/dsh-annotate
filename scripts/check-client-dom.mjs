@@ -77,7 +77,7 @@ const ctx = {
 mod.apply(ctx)
 
 const AnnotateTab = registered.get('dsh-annotate-tab').component
-const ComposerBridge = registered.get('annotate-bridge').component
+const ComposerBridge = registered.get('annotate-capsule').component
 
 // --- mount the composer bridge the way the dock would ------------------------
 let draftValue = 'existing draft'

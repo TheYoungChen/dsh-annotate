@@ -1,188 +1,85 @@
 /**
- * Compare the payload against the two entries actually sent from the field.
+ * Guard the hand-off boundary between the two halves.
  *
- * The report was that the block is long because it carries detailed DOM
- * structure. This measures the real difference on that exact input, so the
- * saving is a number rather than a claim.
+ * The block sent to the model used to be built in the sidebar and written into
+ * the composer, which is why the reader saw it as their own text. It is now
+ * built by the host and delivered as runtime context. This test exists to keep
+ * that boundary where it is: the moment the client starts rendering a block
+ * again, the reader starts seeing it again.
+ *
+ * The block's own wording is checked against the real renderer in check-block.mjs.
  */
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 
-const require = createRequire('C:/Users/a3025/.dsh/profiles/web/package.json')
-const jsdomDir = 'E:/StudyFile/AI-Workspace/deepseek-harness/node_modules/.pnpm/jsdom@29.1.1_@noble+hashes@2.3.0/node_modules'
-const { JSDOM } = require(`${jsdomDir}/jsdom`)
+const HERE = fileURLToPath(new URL('..', import.meta.url))
+const clientSrc = readFileSync(`${HERE}/client.js`, 'utf8')
+const hostSrc = readFileSync(`${HERE}/lib/index.js`, 'utf8')
 
-// The exact entries from the field report, with the selectors the improved
-// builder now produces for the same two elements.
-const ENTRIES = [
-  {
-    id: 'a1',
-    selector: '.lb-hero',
-    selectorMatches: 1,
-    tag: 'div',
-    role: 'div',
-    text: '¥126.84',
-    note: '',
-    doc: { x: 57, y: 166, w: 155, h: 44 },
-  },
-  {
-    id: 'a2',
-    selector: '.lb-band',
-    selectorMatches: 1,
-    tag: 'div',
-    role: 'div',
-    text: '214,502',
-    note: '测试效果222',
-    doc: { x: 448, y: 169, w: 101, h: 39 },
-  },
-]
-const META = { url: 'http://localhost:54903/wallet-v3.html', w: 1018, h: 546 }
-
-// --- the previous format, for comparison --------------------------------------
-// Uses the selectors the OLD builder produced for these same two elements, so
-// the before/after reflects what actually changed.
-const OLD_SELECTORS = {
-  a1: 'body > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2)',
-  a2: 'body > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(5) > div:nth-of-type(2)',
-}
-
-function renderOld(annotations, meta) {
-  const head = `🎯 界面标注 · ${meta.url} · ${meta.w}×${meta.h} (${annotations.length})`
-  const blocks = annotations.map((entry, index) => {
-    const note = String(entry.note || '').trim()
-    const tag = note ? '[批注]' : '[标注]'
-    const selector = OLD_SELECTORS[entry.id] || entry.selector
-    const lines = [`#${index + 1} ${tag} ${selector}`]
-    if (selector) lines.push(`   selector: ${selector} (matches: ${entry.selectorMatches})`)
-    if (entry.text) lines.push(`   text: ${entry.text}`)
-    if (entry.doc) lines.push(`   position: x=${entry.doc.x} y=${entry.doc.y} ${entry.doc.w}×${entry.doc.h}`)
-    if (note) lines.push(`   note: ${note}`)
-    return lines.join('\n')
-  })
-  return [head, '', blocks.join('\n\n')].join('\n')
-}
-
-// --- the shipped format, loaded from the bundle --------------------------------
-const src = readFileSync('E:/StudyFile/AI-Workspace/dsh_workspace/plugins/dsh-annotate/client.js', 'utf8')
-// Exercise the real function by evaluating the module in a jsdom window, which
-// is how it runs in the browser.
-const dom = new JSDOM('<!doctype html><html><body></body></html>', { runScripts: 'dangerously', url: 'http://localhost:9/' })
-const { window } = dom
-window.__ModuleLoader__ = { load: (def) => window.__ModuleLoader__.loaded.push(def), loaded: [] }
-const script = window.document.createElement('script')
-script.textContent = src
-window.document.body.appendChild(script)
-
-const loaded = window.__ModuleLoader__.loaded[0]
-if (!loaded) {
-  console.log('the bundle did not register with the loader')
-  process.exit(1)
-}
-
-// Reach renderPayload through the registered tab component is awkward; the
-// function is module-private, so the comparison uses the same rules the bundle
-// applies, asserted against the source itself.
-// The comparison below mirrors the shipped rules. Confirm they are still the
-// ones in the bundle, so this file cannot drift into testing a stale format.
-const newRulesHold = [
-  /lines\.push\(`   text: \$\{entry\.text\}`\)/.test(src),
-  /lines\.push\(`   at: \$\{entry\.doc\.x\},\$\{entry\.doc\.y\}/.test(src),
-  /\/nth-of-type\/\.test\(selector\)/.test(src),
-  // The selector must appear once, on the header line, not repeated below.
-  !/lines\.push\(`   selector: /.test(src),
-]
-console.log('shipped format uses the terse rules:', newRulesHold.every(Boolean))
-if (!newRulesHold.every(Boolean)) {
-  console.log('rules not found in the bundle — the comparison below would be meaningless')
-  process.exit(1)
-}
-
-// Render the new format by the shipped rules.
-function renderNew(annotations, meta) {
-  const head = `🎯 界面标注 · ${meta.url} · ${meta.w}×${meta.h} (${annotations.length})`
-  const blocks = annotations.map((entry, index) => {
-    const note = String(entry.note || '').trim()
-    const tag = `[${note ? '批注' : '标注'}]`
-    const selector = entry.selector || entry.tag || ''
-    const lines = [`#${index + 1} ${tag} ${selector}`]
-    if (entry.text) lines.push(`   text: ${entry.text}`)
-    if (entry.doc) lines.push(`   at: ${entry.doc.x},${entry.doc.y} ${entry.doc.w}×${entry.doc.h}`)
-    if (/nth-of-type/.test(selector) && typeof entry.selectorMatches === 'number') {
-      lines.push(`   matches: ${entry.selectorMatches}`)
-    }
-    if (entry.testId) lines.push(`   testid: ${entry.testId}`)
-    if (entry.ariaLabel) lines.push(`   aria-label: ${entry.ariaLabel}`)
-    if (note) lines.push(`   note: ${note}`)
-    return lines.join('\n')
-  })
-  return [head, '', blocks.join('\n\n')].join('\n')
-}
-
-const before = renderOld(ENTRIES, META)
-const after = renderNew(ENTRIES, META)
-
-console.log('\n=== BEFORE ===')
-console.log(before)
-console.log('\n=== AFTER ===')
-console.log(after)
-
-const linesBefore = before.split('\n').length
-const linesAfter = after.split('\n').length
-console.log('\n=== comparison ===')
-console.log('  lines:', linesBefore, '->', linesAfter)
-console.log('  chars:', before.length, '->', after.length)
-
-// Rough token proxy: this text is mostly ASCII with some CJK, so characters are
-// the honest unit here rather than a made-up token count.
-const saved = Math.round((1 - after.length / before.length) * 100)
-console.log(`  ${saved}% shorter`)
-
-if (after.length >= before.length) {
-  console.log('\nFAIL: the new format is not shorter')
-  process.exit(1)
-}
-
-// --- the block must not repeat a field ----------------------------------------
-console.log('\n=== no field is repeated within a block ===')
-const FIELD = /^\s{3}([a-z-]+):/gm
-let duplicated = false
-for (const block of after.split('\n\n').slice(1)) {
-  const seen = new Set()
-  for (const match of block.matchAll(FIELD)) {
-    if (seen.has(match[1])) {
-      console.log(`  FAIL: "${match[1]}" appears twice in one block`)
-      duplicated = true
-    }
-    seen.add(match[1])
+let failures = 0
+const check = (ok, label, detail) => {
+  console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`)
+  if (!ok) {
+    failures += 1
+    if (detail) console.log(`       ${detail}`)
   }
 }
-if (duplicated) process.exit(1)
-console.log('  ok   every field appears at most once per block')
 
-// --- the intent line must invite a request -------------------------------------
-console.log('\n=== the attached block invites the request ===')
-const attachSrc = readFileSync('E:/StudyFile/AI-Workspace/dsh_workspace/plugins/dsh-annotate/client.js', 'utf8')
-const hasAsk = /panel\.askLine/.test(attachSrc)
-console.log(`  ${hasAsk ? 'ok  ' : 'FAIL'} a prompt line is appended when attaching`)
-if (!hasAsk) process.exit(1)
-const zhAsk = [...attachSrc.matchAll(/'panel\.askLine': '([^']+)'/g)].map((m) => m[1])
-console.log(`  prompt text: ${zhAsk.join(' | ') || '(missing)'}`)
-// Both catalogs must carry the line, and at least one must ask what to change.
-if (zhAsk.length < 2) {
-  console.log('  FAIL: the prompt line is not present in both languages')
+console.log('=== the client no longer renders a block ===')
+// Any of these reappearing means the sidebar is building model-facing text
+// again, which is the exact regression this file guards.
+check(!/renderPayload/.test(clientSrc), 'no renderPayload in the client')
+check(!/payloadFor/.test(clientSrc), 'no payloadFor in the client')
+check(!/Web page elements/.test(clientSrc), 'the client does not know the block heading')
+check(!/界面标注|UI annotations/.test(clientSrc), 'no block header text in the client')
+check(!/🎯/.test(clientSrc), 'no decorative marker in the client')
+check(!/panel\.askLine/.test(clientSrc), 'the appended prompt line is gone')
+
+console.log('\n=== the client reports picks, not prose ===')
+// What crosses to the host is the raw pick, so the host owns all phrasing.
+check(/fetch\(`\$\{API\}\/context`/.test(clientSrc), 'the client posts to the context action')
+check(/session: sessionKey, annotations: payload/.test(clientSrc), 'it sends the session and the raw entries')
+// Anchor on the declaration, not on a chain that a refactor rewrites. A missing
+// anchor would report every field as absent, which reads as five real failures.
+const shapeStart = clientSrc.indexOf('const toReport = ')
+const shapeEnd = clientSrc.indexOf('/**', shapeStart)
+check(shapeStart !== -1 && shapeEnd > shapeStart, 'the reported payload was located')
+const payloadShape = shapeStart === -1 ? '' : clientSrc.slice(shapeStart, shapeEnd)
+for (const field of ['selector', 'text', 'note', 'at', 'matches']) {
+  check(new RegExp(`${field}:`).test(payloadShape), `the reported entry carries "${field}"`)
+}
+check(!/lines\.push|join\('\\n'\)/.test(payloadShape), 'the client composes no text')
+
+console.log('\n=== the draft is never written with a block ===')
+const shipBody = clientSrc.slice(clientSrc.indexOf('const ship ='), clientSrc.indexOf('const canSend'))
+check(!/setDraft\([^)]*block/.test(shipBody), 'ship never writes a block into the draft')
+// The one setDraft call clears the draft after a successful direct send.
+const writes = [...shipBody.matchAll(/setDraft\(([^)]*)\)/g)].map((m) => m[1].trim())
+check(writes.length <= 1, 'at most one setDraft call remains', writes.join(' | '))
+check(writes.every((w) => w === "''"), 'the only write is clearing after send', writes.join(' | '))
+
+console.log('\n=== the host owns the block ===')
+check(/# Web page elements/.test(hostSrc), 'the host renders the heading')
+check(/function|const renderAnnotations/.test(hostSrc), 'the host owns a renderer')
+check(/systemPrompt\.context\(/.test(hostSrc), 'the block travels as runtime context')
+
+console.log('\n=== the controls describe the new behaviour ===')
+// Marks reach the host as they are made, so there is no hand-over control at all
+// and nothing is gated on the draft having text.
+check(!/panel\.needText/.test(clientSrc), 'no "type first" gate remains')
+check(!/panel\.attach'/.test(clientSrc), 'the attach label is gone from both catalogs')
+check(!/panel\.sendHint/.test(clientSrc), 'and so is its tooltip')
+
+// The only action the panel still offers is the destructive one. Everything else
+// happens on its own, which is the whole point: the reader annotates and writes.
+check(!/onAttach/.test(clientSrc) && !/onSend/.test(clientSrc),
+  'no hand-over or send action survives')
+check(/t\('panel\.removeAll'\)/.test(clientSrc), 'clearing is the one remaining action')
+check(/void clearAll\(\)/.test(clientSrc), 'and it is wired to the clearer')
+
+console.log('')
+if (failures) {
+  console.log(`BOUNDARY CHECKS FAILED — ${failures} problem(s)`)
   process.exit(1)
 }
-if (!zhAsk.some((one) => /改/.test(one))) {
-  console.log('  FAIL: the prompt does not ask what to change')
-  process.exit(1)
-}
-
-// --- direct send must not be the primary action --------------------------------
-console.log('\n=== adding to the composer is the primary action ===')
-const attachPrimary = /className: 'dsa-btn', 'data-primary': true, onClick: onAttach/.test(attachSrc)
-const sendPrimary = /'data-primary': true, onClick: onSend/.test(attachSrc)
-console.log(`  ${attachPrimary ? 'ok  ' : 'FAIL'} "add to composer" carries data-primary`)
-console.log(`  ${!sendPrimary ? 'ok  ' : 'FAIL'} "send" is demoted to secondary`)
-if (!attachPrimary || sendPrimary) process.exit(1)
-
-console.log('\nPAYLOAD COMPARISON PASSED')
+console.log('BOUNDARY CHECKS PASSED')

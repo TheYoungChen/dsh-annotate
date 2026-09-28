@@ -9,12 +9,13 @@
  */
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 
 const require = createRequire('C:/Users/a3025/.dsh/profiles/web/package.json')
 const jsdomDir = 'E:/StudyFile/AI-Workspace/deepseek-harness/node_modules/.pnpm/jsdom@29.1.1_@noble+hashes@2.3.0/node_modules'
 const { JSDOM } = require(`${jsdomDir}/jsdom`)
 
-const overlaySrc = readFileSync('E:/StudyFile/AI-Workspace/dsh_workspace/plugins/dsh-annotate/lib/overlay.js', 'utf8')
+const overlaySrc = readFileSync(fileURLToPath(new URL('../lib/overlay.js', import.meta.url)), 'utf8')
 
 const failures = []
 const ok = (condition, label, detail) => {

@@ -1,6 +1,6 @@
 {
   "name": "dsh-annotate",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "description": "Annotate and comment on any web element in a live preview inside the DSH sidebar, then send it to the conversation as one structured block.",
   "type": "module",
   "license": "MIT",

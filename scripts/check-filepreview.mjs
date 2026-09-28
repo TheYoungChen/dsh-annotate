@@ -10,8 +10,9 @@
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const PLUGIN = 'E:/StudyFile/AI-Workspace/dsh_workspace/plugins/dsh-annotate'
+const PLUGIN = fileURLToPath(new URL('..', import.meta.url))
 const ROOT = 'E:/StudyFile/AI-Workspace/dsh_workspace'
 const OUTSIDE = 'E:/StudyFile/AI-Workspace/dsh_workspace/.tmp-outside-page'
 
@@ -33,6 +34,7 @@ const ok = (condition, label, detail) => {
 async function startHost(config) {
   const script = `
 import { Context } from '${PLUGIN.replace(/\\/g, '/')}/../../deepseek-harness/vendor/cordis/lib/index.js'
+import { fileURLToPath } from 'node:url'
 `
   // Cordis is easier to drive from the plugin's own test harness pattern:
   // import the module and call apply() against a minimal fake context.
@@ -47,6 +49,9 @@ import { Context } from '${PLUGIN.replace(/\\/g, '/')}/../../deepseek-harness/ve
     },
     interval: () => () => {},
     get: () => undefined,
+    // The plugin subscribes to the turn boundary and the step hook; this stand-in
+    // only needs to accept the subscription and hand back a disposer.
+    on: () => () => {},
     webServer: {
       register(spec) {
         routes.push(spec)

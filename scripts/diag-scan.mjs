@@ -2,9 +2,9 @@
  * Show what the port scan actually reports for the servers on this machine,
  * including the stack fingerprints. This is the readout the panel renders.
  */
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 
-const mod = await import(pathToFileURL('E:/StudyFile/AI-Workspace/dsh_workspace/plugins/dsh-annotate/lib/index.js').href)
+const mod = await import(pathToFileURL(fileURLToPath(new URL('../lib/index.js', import.meta.url))).href)
 
 // Reach the probe helpers the host uses. They are module-private, so the scan
 // is driven through the plugin's own HTTP handler instead: start the route on a

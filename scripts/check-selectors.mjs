@@ -8,6 +8,7 @@
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 
 const require = createRequire('C:/Users/a3025/.dsh/profiles/web/package.json')
 const jsdomDir = 'E:/StudyFile/AI-Workspace/deepseek-harness/node_modules/.pnpm/jsdom@29.1.1_@noble+hashes@2.3.0/node_modules'
@@ -23,7 +24,7 @@ const dom = new JSDOM(html, { url: 'http://localhost:54903/wallet-v3.html', pret
 const { document } = dom.window
 
 // The shipped selector logic, lifted from the bundle and evaluated here.
-const overlay = readFileSync('E:/StudyFile/AI-Workspace/dsh_workspace/plugins/dsh-annotate/lib/overlay.js', 'utf8')
+const overlay = readFileSync(fileURLToPath(new URL('../lib/overlay.js', import.meta.url)), 'utf8')
 const fnStart = overlay.indexOf('function uniqueClassSelector')
 const fnEnd = overlay.indexOf('function matchesOf')
 if (fnStart < 0 || fnEnd < 0) {

@@ -28,14 +28,16 @@ AI 拿到的是 `.lb-hero` 和它的真实文本，不是一句模糊描述。
 
 <!-- TODO(截图): 换成真实截图与录屏。当前 assets/hero.png 是按真实交互画的示意图，
      真实截图请覆盖同名文件即可，无需改 README。
-     录屏放 assets/demo.gif（点「标记」→ 悬停 → 点选 → 写批注 → 加入输入框，10 秒内）。 -->
+     录屏放 assets/demo.gif（点「标记」→ 悬停 → 点选 → 写批注 → 直接发送，10 秒内）。
+     第二张建议截「上下文注入」那一行的展开态，那是它和普通标注工具最不一样的地方。 -->
 
 ## 功能
 
 - **两下点击完成标注** —— 悬停高亮并实时显示选择器，点一下即完成
 - **标注 / 批注两种粒度** —— 只想说"看这里"就留空；要说明改什么就写一句
 - **精确到元素** —— 生成唯一 CSS 选择器，优先语义化 class，而不是一长串 `nth-child`
-- **一次发送多条** —— 按页面从上到下排序，编号与页面里的标记针一一对应
+- **一次带上多条** —— 按页面从上到下排序，编号与页面里的标记针一一对应
+- **不弄脏你的消息** —— 标注作为独立上下文投递，你打的字里看不到它，也不会被误删
 - **技术栈识别** —— 自动探测本地端口并识别框架（Vite / Next / React / Vue 等）
 - **同源代理** —— 不裸嵌目标页，cookie 与 localStorage 按预览隔离
 
@@ -100,10 +102,10 @@ pnpm dsh web --port 3000
 4. 点一下元素 → 卡片弹在元素**下方**
 5. 想写就写，不想写直接保存
 6. 列表按**页面从上到下**排序，编号与页面里的标记针一一对应
-7. 「加入输入框」把这份标注追加到草稿后面，并留一行 `我想改的地方：` 提示你补需求；
-   「发送」则直接发出，不动草稿
+7. 标完直接去输入框写你的要求，正常发送即可 —— 标注**已经跟着走了**
 
-`⌘/Ctrl+点击` 元素 = 写完立刻发送。
+标注不会出现在你打的字里。发送后它作为一条可折叠的「上下文注入」行出现在对话里，
+默认收起，点开才看得到具体内容。
 
 ## 设计取舍
 
@@ -111,22 +113,44 @@ pnpm dsh web --port 3000
 唯一的 class → 位置链（最多 6 层，兜底）。位置链对人没有信息量，页面一改就失效；
 `.lb-hero` 一眼就知道改哪儿。
 
-**载荷刻意保持精简。** 选择器只出现一次，坐标用紧凑写法，`matches: n` 只在可能歧义时输出。
-在同一组真实标注上实测：**602 字符 → 192 字符，减少 68%**，可读性反而更好。
+**标注不写进输入框。** 早先的做法是把标注拼成一段文本追加到草稿后面 —— 用户看到的自己
+的消息里混着一大坨 DOM 结构，既难看又容易被误删。现在标注走宿主的运行时上下文通道，
+以自己的身份投递：你的消息就是你的消息，标注是旁边一条独立记录。
 
-**「加入输入框」是主操作，直接发送是次操作。** 直接发送会跳过"说明要改什么"这一步。
+**载荷刻意保持精简。** 选择器只出现一次；坐标只在选择器可能歧义时才带上；没有任何装饰性
+图标。在同一组真实标注上实测：**602 字符 → 192 字符，减少 68%**。
+
+**没有需求就不发。** 标注是上下文而非消息，草稿为空时没有可附着的对象，此时会提示你先写
+要求，而不是替你发一条空消息。
 
 ## 工作原理
 
 ```
 DSH 宿主
-  └─ lib/index.js       起同源代理 + 注入 + HTTP API
-        ↓ 代理
-     目标应用
+  └─ lib/index.js       起同源代理 + HTTP API + 注册运行时上下文
+        ↓ 代理                              ↑ 标注按会话存在这里
+     目标应用                                 │
   lib/shim.js      改写 fetch/XHR/WebSocket，让子请求也走代理
   lib/overlay.js   帧内：拾取、标记针、评论卡片、页内存储
-        ↕ postMessage
-  client.js        侧边栏：编号列表、排序、载荷构建、会话发送
+        ↕ postMessage                         │
+  client.js        侧边栏：编号列表、排序、把标注报给宿主（只报原始字段，不拼文本）
+```
+
+标注从侧边栏到模型的完整路径：
+
+```
+侧边栏标注变化
+  └─ POST /__dsh-annotate/context   { session, annotations[] }   ← 只传原始字段
+        ↓
+     宿主按 sessionId 存一份待发列表
+        ↓  下一轮对话组装 prompt 时
+     systemPrompt.context() 的 provider 求值
+        ↓
+     以 plugin 身份产出快照消息（不是 user 消息）
+        ↓                          ↓
+     模型收到结构化上下文        界面显示一条可折叠的「上下文注入」行
+        ↓
+     该轮 turn/start 后列表清空，不会重复出现在后续轮次
 ```
 
 三个关键点：
@@ -159,34 +183,71 @@ DSH 宿主
 - 跨域子 iframe 里的元素
 - **在线网站**：当前只支持本地目标（loopback + 工作区页面）。
   在线网站需要额外的 SSRF 加固，尚未实现。
+- **标注只跟着"下一条消息"走**。它在那一轮开始后即被清空，不会一直挂着；
+  想改主意就在发送前直接在侧边栏删掉那一条。
+- **草稿为空时不发送**。标注是上下文不是消息，没有你写的字就没有可附着的对象 ——
+  这时会提示你先写要求，而不是替你发一条空消息。
 
 ## 开发
 
 ```bash
-# 回归测试（12 项）
+# 回归测试（28 项）
 node scripts/preflight-activation.mjs   # 激活链（真实 composeEntries）
 node scripts/preflight-shapes.mjs       # 注册形状对真实 slot key 校验
-node scripts/check-preflight-power.mjs  # 突变测试：注入 10 种故障，全部须被检出
+node scripts/preflight-profile.mjs      # profile 里恰好一行 annotate
 node scripts/check-boot.mjs             # overlay 挂载（head/body 两种注入位置）
-node scripts/check-overlay.mjs          # 标记 / 批注 / 空标注保留 / 卡片停靠
+node scripts/check-overlay.mjs          # 标记 / 批注 / 空标注保留 / 卡片停靠 / 编号连续
 node scripts/check-client.mjs           # 客户端接线
 node scripts/check-client-dom.mjs       # 真实 DOM 渲染
-node scripts/check-layout.mjs           # 空间分配
+node scripts/check-layout.mjs           # 空间分配、detect 唯一入口、浮层不被对话盖住
 node scripts/check-filepreview.mjs      # 文件预览入口 URL
 node scripts/check-stacks.mjs           # 技术栈指纹（9 种，含"认不出就不猜"）
 node scripts/check-selectors.mjs        # 选择器在真实页面上唯一
-node scripts/check-payload.mjs          # 载荷体积与字段
+node scripts/check-block.mjs            # 模型实际收到的文本（跑真实渲染函数）
+node scripts/check-context.mjs          # 标注以 plugin 身份投递，不进用户消息
+node scripts/check-host-apply.mjs       # 宿主 apply() 不会把 DSH 带崩
+node scripts/check-host-http.mjs        # HTTP 边界：畸形输入不落库、不抛错
+node scripts/check-preview-reuse.mjs    # 预览复用不因 null target 抛错
+node scripts/check-report-map.mjs       # 标注上报与列表渲染的健壮性
+node scripts/check-attach-flow.mjs      # 附上流程：跨源消息不被误收
+node scripts/check-handover.mjs         # 附上后宿主仍持有全部标注（含反向验证）
+node scripts/check-capsule.mjs          # 胶囊在输入框上方、计数跟随宿主
+node scripts/check-capsule-wiring.mjs   # 三种 sessionId 传参都能渲染
+node scripts/check-repeat-guard.mjs     # 每 turn 只写一行；交付即释放；epoch 只推进一次
+node scripts/check-delivery-order.mjs   # 交付时刻释放（不是 turn/end）
+node scripts/check-accent.mjs           # 配色：变量作用域、对比度、胶囊不透明且有颜色
+node scripts/check-interaction.mjs      # Esc 退出标记；只有一个交接动作
+node scripts/check-payload.mjs          # 客户端不再拼文本（交接边界守卫）
+node scripts/check-selector-target.mjs  # 选择器以目标元素结尾，不是它的祖先
+node scripts/check-duplicate-nodes.mjs  # 同结构节点上的两个标注不会解析到同一个元素
+
+# 变异检测：注入 34 个故障，每一个都必须被抓到
+node scripts/check-preflight-power.mjs
+
+# 对一个真实运行中的实例复查（默认 3099，先起好）
+node scripts/check-preview-inline.mjs http://127.0.0.1:3099
 
 # 冒烟 / 诊断
 node scripts/smoke-host.mjs
 node scripts/smoke-proxy.mjs
 ```
 
+手工注入过变异之后（`node scripts/mutate.mjs . <name>`），用这个还原：
+
+```bash
+node scripts/mutate.mjs . restore
+```
+
 `check-preflight-power.mjs` 会**故意注入故障**来验证测试本身有效 ——
 因为一套永远绿的测试等于没有测试。
 
+每个新断言都必须在注入对应故障后**确实失败**，才算数。这条规则不是形式主义：
+本仓库出现过两次「断言字符串存在」而不是「断言值正确」的假测试，以及一次竞态导致
+同一个测试三次里失败一次 —— 那一次最终被改成确定性实现，而不是放宽断言。
+
 ## 文档
 
+- [`CHANGELOG.md`](CHANGELOG.md) —— 每个版本用户可见的变化
 - `docs/compatibility.md` —— DSH 版本兼容声明、依据，以及尚未完成的运行验收步骤
 - `docs/design-principles.md` —— 设计原则
 - `docs/reference-element-facts.ts` —— 元素信息采集参考实现（ARIA role 映射等），

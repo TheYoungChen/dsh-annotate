@@ -10,10 +10,10 @@
  * scan, so the test exercises header capture and body reading, not just the
  * classifier in isolation.
  */
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import http from 'node:http'
 
-const PLUGIN = 'E:/StudyFile/AI-Workspace/dsh_workspace/plugins/dsh-annotate'
+const PLUGIN = fileURLToPath(new URL('..', import.meta.url))
 const WORKSPACE = 'E:/StudyFile/AI-Workspace/dsh_workspace'
 
 const FIXTURES = [
@@ -71,6 +71,37 @@ const FIXTURES = [
     body: '<h1>just some html</h1>',
     expect: null,
   },
+  {
+    // The reported case: a port that answers every path with 404. It is listening,
+    // so the sweep sees it, but a reader who clicked it landed on "not found".
+    name: 'a listener that 404s everywhere',
+    headers: { 'content-type': 'text/html' },
+    body: '<h1>404 Not Found</h1>',
+    status: 404,
+    expect: null,
+    expectListed: false,
+  },
+  {
+    // A service that serves real content but sets no `<title>`. It must stay in the
+    // list — it IS openable — and carry its entry path and content type so the row
+    // is not a bare "localhost".
+    name: 'a page with no title',
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+    body: '<h1>no title here</h1>',
+    expect: null,
+    expectListed: true,
+    expectPath: '/',
+  },
+  {
+    // Serving at a sub-path only. The row must point at the path that answered.
+    name: 'a page served only at /docs',
+    headers: { 'content-type': 'text/html' },
+    body: '<title>Docs</title>',
+    onlyPath: '/docs',
+    expect: null,
+    expectListed: true,
+    expectPath: '/docs',
+  },
 ]
 
 const failures = []
@@ -83,7 +114,14 @@ const ok = (condition, label, detail) => {
 const servers = []
 for (const fixture of FIXTURES) {
   const server = http.createServer((req, res) => {
-    res.writeHead(200, fixture.headers)
+    // A fixture may serve only one path, so the probe's walk for a usable entry
+    // point can be exercised rather than assumed.
+    if (fixture.onlyPath && req.url !== fixture.onlyPath) {
+      res.writeHead(404, { 'content-type': 'text/html' })
+      res.end('<h1>404</h1>')
+      return
+    }
+    res.writeHead(fixture.status || 200, fixture.headers)
     res.end(fixture.body)
   })
   await new Promise((r) => server.listen(0, '127.0.0.1', r))
@@ -102,6 +140,9 @@ mod.apply(
     },
     interval: () => () => {},
     get: () => undefined,
+    // The plugin subscribes to the turn boundary and the step hook; this stand-in
+    // only needs to accept the subscription and hand back a disposer.
+    on: () => () => {},
     logger: { warn() {}, info() {}, error() {} },
     webServer: {
       register(spec) {
@@ -134,6 +175,14 @@ console.log(`scan returned ${result.servers.length} servers\n`)
 for (const fixture of FIXTURES) {
   const found = result.servers.find((s) => s.port === fixture.port)
   console.log(fixture.name)
+  // A fixture may declare that it should not be offered at all — the port that
+  // answers 404 everywhere. Listing it is the reported bug.
+  if (fixture.expectListed === false) {
+    ok(!found, 'the port is NOT offered, because it has nothing to open',
+      found ? `:${found.port} was listed` : '(correctly absent)')
+    console.log('')
+    continue
+  }
   if (fixture.expect === null) {
     ok(Boolean(found), 'the server is still listed even with no label', found && `:${found.port}`)
     ok(!found || !found.stack, 'no stack is guessed', (found && found.stack && found.stack.label) || '(none)')
@@ -141,6 +190,15 @@ for (const fixture of FIXTURES) {
     ok(Boolean(found), 'the server is found', found ? `:${found.port}` : 'not found')
     const label = found && found.stack && found.stack.label
     ok(Boolean(label) && fixture.expect.test(label), 'labelled correctly', label || '(none)')
+  }
+  // The entry path and content type are what make a titleless row identifiable.
+  if (fixture.expectPath !== undefined) {
+    ok(found && found.path === fixture.expectPath, 'the entry path is reported',
+      found ? `${found.path} (wanted ${fixture.expectPath})` : 'not found')
+  }
+  if (found) {
+    ok(typeof found.type === 'string' && found.type.length > 0,
+      'the content type is reported, so a titleless row can still be named', found.type || '(none)')
   }
   console.log('')
 }

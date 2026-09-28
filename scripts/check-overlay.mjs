@@ -196,6 +196,74 @@ const pins = document.querySelectorAll('.dsa-pin')
 assert.equal(pins.length, 2, 'two numbered pins rendered')
 console.log('pins:', [...pins].map((p) => `${p.textContent}:${p.getAttribute('data-kind')}`).join(' '))
 
+// --- the numbers are gapless -------------------------------------------------
+// The reader saw 1, then 3, with no 2 anywhere: a pin that could not be placed
+// (scrolled out of its container, or detached by a re-render) still consumed its
+// number, because the label came from the position in the list rather than from
+// the pins actually drawn. Numbering is only useful if it counts what is visible.
+//
+// Driven through `pinAnchor` rather than by removing a DOM node: an element that
+// still resolves has a perfectly good anchor, so deleting one proves nothing about
+// the unplaceable path. The check below forces exactly one annotation to be
+// unplaceable and asserts the survivors renumber.
+console.log('\n--- pin numbering ---')
+{
+  const labels = [...document.querySelectorAll('.dsa-pin')].map((p) => Number(p.textContent))
+  assert.deepEqual(labels, [1, 2], 'a full set numbers 1..n with no gaps')
+
+  // The reader's case: three entries where the MIDDLE one cannot be placed, so they
+  // saw 1 and 3 with no 2. The middle position is what matters. Dropping the first
+  // or the last leaves a survivor whose index in the list still matches its position
+  // among the drawn pins, so index-based numbering looks correct and the fault hides.
+  //
+  // Annotations are built by clicking, the way a reader makes them, because that is
+  // the only path that reaches the real `commit` and so the real pin list.
+  const overlayWindow = window
+  const third = overlayWindow.document.createElement('div')
+  third.className = 'third-target'
+  third.textContent = 'third'
+  overlayWindow.document.body.appendChild(third)
+
+  // Mark the middle element too, then break its selector so its pin cannot anchor.
+  const middle = overlayWindow.document.createElement('div')
+  middle.className = 'middle-target'
+  middle.textContent = 'middle'
+  overlayWindow.document.body.insertBefore(middle, third)
+
+  const markAndSave = async (node) => {
+    clickAt(node)
+    await new Promise((r) => setTimeout(r, 20))
+    const card = overlayWindow.document.querySelector('.dsa-card')
+    assert.ok(card, 'a card opened for the clicked element')
+    card.querySelector('[data-primary]').dispatchEvent(new overlayWindow.MouseEvent('click', { bubbles: true }))
+    await new Promise((r) => setTimeout(r, 20))
+  }
+
+  await markAndSave(middle)
+  await markAndSave(third)
+
+  // Two entries already exist from the checks above, so these are the 3rd and 4th.
+  const before = [...overlayWindow.document.querySelectorAll('.dsa-pin')].map((p) => Number(p.textContent))
+  assert.deepEqual(before, before.map((_, i) => i + 1), 'the entries so far number 1..n')
+  assert.ok(before.length >= 3, 'at least three pins exist before the gap is made', `${before.length}`)
+
+  // Detach the middle element: its annotation stays in the list, but its anchor is
+  // gone, which is exactly the re-render case that produced the gap.
+  middle.remove()
+  overlayWindow.dispatchEvent(new overlayWindow.Event('resize'))
+  await new Promise((r) => setTimeout(r, 60))
+
+  const after = [...overlayWindow.document.querySelectorAll('.dsa-pin')]
+  const afterLabels = after.map((p) => Number(p.textContent))
+  assert.ok(after.length >= 2, 'the placeable pins are still drawn', `${after.length} drawn`)
+  assert.deepEqual(
+    afterLabels,
+    after.map((_, i) => i + 1),
+    'a gap in the middle does not leave a gap in the numbers',
+  )
+  console.log(`  middle entry unplaceable -> labels ${JSON.stringify(afterLabels)} (index-based would read 1,3)`)
+}
+
 // --- persistence across a reload ---------------------------------------------
 assert.ok(window.localStorage.getItem('dsh-annotate:v1:test:/pricing'), 'entries persisted to page storage')
 console.log('persisted to localStorage under session+path key')

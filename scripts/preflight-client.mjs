@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const ENTRY = 'E:/StudyFile/AI-Workspace/dsh_workspace/plugins/dsh-annotate/lib/index.js'
+const ENTRY = fileURLToPath(new URL('../lib/index.js', import.meta.url))
 const entryUrl = pathToFileURL(ENTRY).href
 console.log('entry url:', entryUrl)
 

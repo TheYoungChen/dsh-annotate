@@ -8,12 +8,13 @@
  */
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 
 // jsdom and the React pair live in the harness store, not beside this plugin.
 const require = createRequire('C:/Users/a3025/.dsh/profiles/web/package.json')
 const jsdomDir = 'E:/StudyFile/AI-Workspace/deepseek-harness/node_modules/.pnpm/jsdom@29.1.1_@noble+hashes@2.3.0/node_modules'
 const { JSDOM } = require(`${jsdomDir}/jsdom`)
-const pluginDir = 'E:/StudyFile/AI-Workspace/dsh_workspace/plugins/dsh-annotate'
+const pluginDir = fileURLToPath(new URL('..', import.meta.url))
 const overlaySrc = readFileSync(`${pluginDir}/lib/overlay.js`, 'utf8')
 
 const dom = new JSDOM(

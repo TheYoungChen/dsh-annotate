@@ -86,7 +86,12 @@ mod.apply(ctx)
 console.log('registered slots:', [...injected.keys()].join(', '))
 assert.ok(registered.has('dsh-annotate-tab'), 'sidebar tab registered')
 assert.ok(registered.has('tab:dsh-annotate-tab'), 'sidebarRightTabs registration recorded')
-assert.ok(injected.has('conversation.input.dock'), 'composer bridge contributed')
+// The input dock, not the composer dock. ConversationRoot renders
+// `conversation.input.dock` as a sibling BEFORE `conversation.composer.bar` inside
+// a `flex-direction: column` stack, so the input dock is the one that appears
+// ABOVE the input box; `conversation.composer.dock` is rendered by InputBar after
+// the card, which puts it below.
+assert.ok(injected.has('conversation.input.dock'), 'capsule contributed above the composer')
 
 const tabDef = registered.get('tab:dsh-annotate-tab')
 assert.equal(typeof tabDef.title, 'function')
@@ -99,8 +104,13 @@ const AnnotateTab = registered.get('dsh-annotate-tab').component
 const markup = renderToStaticMarkup(
   React.createElement(AnnotateTab, { sessionId: 's1' }),
 )
-assert.ok(markup.includes('标记'), 'mark button present in zh')
-assert.ok(markup.includes('还没有标注'), 'empty state present in zh')
+assert.ok(markup.includes('选取'), 'select button present in zh')
+// The empty state moved from a row above the frame into the frame itself, so it
+// no longer pushes the page down before there is a page.
+assert.ok(markup.includes('暂无标注') || markup.includes('若页面持续空白'),
+  'the empty frame carries guidance in zh')
+assert.ok(markup.includes('dsa-empty-frame'), 'and it is the frame that carries it')
+assert.ok(!/dsa-collapse/.test(markup), 'no leftover collapse block from the old toolbar')
 console.log('tab renders, length:', markup.length)
 
 // --- the payload shape -------------------------------------------------------
