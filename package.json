@@ -1,7 +1,7 @@
 {
   "name": "dsh-annotate",
-  "version": "0.2.2",
-  "description": "Annotate and comment on any web element in a live preview inside the DSH sidebar, then send it to the conversation as one structured block.",
+  "version": "0.2.3",
+  "description": "Click any element in a live page preview inside the DSH sidebar, annotate or comment on it, and send it to the AI conversation as structured context — no screenshots, no guessing which element you meant.",
   "type": "module",
   "license": "MIT",
   "main": "lib/index.js",
@@ -30,10 +30,17 @@
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
+    "deepseek",
     "annotate",
     "annotation",
-    "review",
-    "devtools"
+    "element-picker",
+    "element-inspector",
+    "visual-feedback",
+    "ui-review",
+    "web-preview",
+    "devtools",
+    "css-selector",
+    "ai-agent"
   ],
   "dsh": {
     "bundle": {

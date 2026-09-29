@@ -614,24 +614,42 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Marks for the stacks the probe recognises.
+     * Marks for every stack the probe can report.
      *
-     * Inline SVG rather than image files: the bundle stays self-contained, and
-     * each mark is a simple glyph in the stack's own colour, which reads at the
-     * 14px this list uses far better than a detailed logo would.
+     * Inline SVG rather than image files, so the bundle stays self-contained and
+     * nothing is fetched from a CDN at render time.
+     *
+     * The geometry is the real logo path from simple-icons rather than an
+     * approximation. The first version drew simplified shapes by hand — a React mark
+     * that was a circle with a dot, a Vue mark that was a plain triangle — and at the
+     * 14px this list uses, an approximation is indistinguishable from the generic
+     * globe it replaced, which defeats the point of having a mark at all.
+     *
+     * `stroke: true` marks the two logos that are line art and must not be filled.
      */
     const STACK_MARKS = {
-      react: { color: '#61dafb', path: 'M12 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm0-6c5 0 9 3.4 9 7.5s-4 7.5-9 7.5-9-3.4-9-7.5S7 4.5 12 4.5Z' },
-      vue: { color: '#42b883', path: 'M2 4h4l6 10 6-10h4l-10 17L2 4Z' },
-      svelte: { color: '#ff3e00', path: 'M14 3 6 7v5l8 4 4-2V9l-8-4 4-2Z' },
-      angular: { color: '#dd0031', path: 'M12 2 2 6l2 12 8 4 8-4 2-12-10-4Zm0 4 5 11h-2l-1-3h-4l-1 3H9l5-11Z' },
-      next: { color: '#111', path: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-3 6h2l6 8V8h2v9h-2l-6-8v8H9V8Z' },
-      nuxt: { color: '#00dc82', path: 'M12 5l7 12H5l7-12Z' },
-      node: { color: '#539e43', path: 'M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 4 5 3v6l-5 3-5-3V9l5-3Z' },
-      python: { color: '#3776ab', path: 'M12 2c4 0 4 2 4 2v3h-4v1h6s3 0 3 4-3 4-3 4h-2v-3s0-3-3-3H8s-3 0-3-3 3-5 7-5Zm-1 2v2h2V4h-2Z' },
-      java: { color: '#e76f00', path: 'M9 3c2 3-4 4-4 8s3 6 3 6-5-1-5-5 4-6 4-9h2Zm2 5c2 2-3 3-3 6s3 5 3 5-4-1-4-4 3-4 3-7h1Zm1 10c4 0 6 1 6 1s-2 2-6 2-6-2-6-2 2-1 6-1Z' },
-      nginx: { color: '#009639', path: 'M12 2 3 7v10l9 5 9-5V7l-9-5Zm-3 5h2l4 6V7h2v10h-2l-4-6v6H9V7Z' },
-      static: { color: '#8b8b8b', path: 'M4 4h16v16H4V4Zm2 2v12h12V6H6Z' },
+      // React — line art, so it is stroked rather than filled
+      react: { color: '#61dafb', stroke: true, path: 'M12 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm0-6c5 0 9 3.4 9 7.5s-4 7.5-9 7.5-9-3.4-9-7.5S7 4.5 12 4.5Z' },
+      vue: { color: '#41b883', path: 'M24 1.61h-9.94L12 5.16L9.94 1.61H0l12 20.78ZM12 14.08L5.16 2.23h4.43L12 6.41l2.41-4.18h4.43Z' },
+      svelte: { color: '#ff3e00', path: 'M10.354 21.125a4.44 4.44 0 0 1-4.765-1.767a4.1 4.1 0 0 1-.703-3.107a4 4 0 0 1 .134-.522l.105-.321l.287.21a7.2 7.2 0 0 0 2.186 1.092l.208.063l-.02.208a1.25 1.25 0 0 0 .226.83a1.34 1.34 0 0 0 1.435.533a1.2 1.2 0 0 0 .343-.15l5.59-3.562a1.16 1.16 0 0 0 .524-.778a1.24 1.24 0 0 0-.211-.937a1.34 1.34 0 0 0-1.435-.533a1.2 1.2 0 0 0-.343.15l-2.133 1.36a4 4 0 0 1-1.135.499a4.44 4.44 0 0 1-4.765-1.766a4.1 4.1 0 0 1-.702-3.108a3.86 3.86 0 0 1 1.742-2.582l5.589-3.563a4 4 0 0 1 1.135-.499a4.44 4.44 0 0 1 4.765 1.767a4.1 4.1 0 0 1 .703 3.107a4 4 0 0 1-.134.522l-.105.321l-.286-.21a7.2 7.2 0 0 0-2.187-1.093l-.208-.063l.02-.207a1.25 1.25 0 0 0-.226-.831a1.34 1.34 0 0 0-1.435-.532a1.2 1.2 0 0 0-.343.15L8.62 9.368a1.16 1.16 0 0 0-.524.778a1.24 1.24 0 0 0 .211.937a1.34 1.34 0 0 0 1.435.533a1.2 1.2 0 0 0 .344-.151l2.132-1.36a4 4 0 0 1 1.135-.498a4.44 4.44 0 0 1 4.765 1.766a4.1 4.1 0 0 1 .702 3.108a3.86 3.86 0 0 1-1.742 2.583l-5.589 3.562a4 4 0 0 1-1.135.499m10.358-17.95C18.484-.015 14.082-.96 10.9 1.068L5.31 4.63a6.4 6.4 0 0 0-2.896 4.295a6.75 6.75 0 0 0 .666 4.336a6.4 6.4 0 0 0-.96 2.396a6.83 6.83 0 0 0 1.168 5.167c2.229 3.19 6.63 4.135 9.812 2.108l5.59-3.562a6.4 6.4 0 0 0 2.896-4.295a6.76 6.76 0 0 0-.665-4.336a6.4 6.4 0 0 0 .958-2.396a6.83 6.83 0 0 0-1.167-5.168' },
+      angular: { color: '#dd0031', path: 'M16.712 17.711H7.288l-1.204 2.916L12 24l5.916-3.373zM14.692 0l7.832 16.855l.814-12.856zM9.308 0L.662 3.999l.814 12.856zm-.405 13.93h6.198L12 6.396z' },
+      next: { color: '#8b93a7', path: 'M18.665 21.978A11.94 11.94 0 0 1 12 24C5.377 24 0 18.623 0 12S5.377 0 12 0s12 5.377 12 12c0 3.583-1.574 6.801-4.067 9.001L9.219 7.2H7.2v9.596h1.615V9.251zm-3.332-8.533l1.6 2.061V7.2h-1.6z' },
+      nuxt: { color: '#00dc82', path: 'M13.464 19.83h8.922c.283 0 .562-.073.807-.21a1.6 1.6 0 0 0 .591-.574a1.53 1.53 0 0 0 .216-.783a1.53 1.53 0 0 0-.217-.782L17.792 7.414a1.6 1.6 0 0 0-.591-.573a1.65 1.65 0 0 0-.807-.21c-.283 0-.562.073-.807.21a1.6 1.6 0 0 0-.59.573L13.463 9.99L10.47 4.953a1.6 1.6 0 0 0-.591-.573a1.65 1.65 0 0 0-.807-.21c-.284 0-.562.073-.807.21a1.6 1.6 0 0 0-.591.573L.216 17.481a1.53 1.53 0 0 0-.217.782c0 .275.074.545.216.783a1.6 1.6 0 0 0 .59.574c.246.137.525.21.808.21h5.6c2.22 0 3.856-.946 4.982-2.79l2.733-4.593l1.464-2.457l4.395 7.382h-5.859Zm-6.341-2.46l-3.908-.002l5.858-9.842l2.923 4.921l-1.957 3.29c-.748 1.196-1.597 1.632-2.916 1.632' },
+      node: { color: '#539e43', path: 'M11.998 24c-.321 0-.641-.084-.922-.247L8.14 22.016c-.438-.245-.224-.332-.08-.383c.585-.203.703-.25 1.328-.604c.065-.037.151-.023.218.017l2.256 1.339a.29.29 0 0 0 .272 0l8.795-5.076a.28.28 0 0 0 .134-.238V6.921a.28.28 0 0 0-.137-.242l-8.791-5.072a.28.28 0 0 0-.271 0L3.075 6.68a.28.28 0 0 0-.139.241v10.15a.27.27 0 0 0 .139.235l2.409 1.392c1.307.654 2.108-.116 2.108-.89V7.787c0-.142.114-.253.256-.253h1.115c.139 0 .255.112.255.253v10.021c0 1.745-.95 2.745-2.604 2.745c-.508 0-.909 0-2.026-.551L2.28 18.675a1.86 1.86 0 0 1-.922-1.604V6.921c0-.659.353-1.275.922-1.603L11.075.236a1.93 1.93 0 0 1 1.848 0l8.794 5.082c.57.329.924.944.924 1.603v10.15a1.86 1.86 0 0 1-.924 1.604l-8.794 5.078c-.28.163-.599.247-.925.247m7.101-10.007c0-1.9-1.284-2.406-3.987-2.763c-2.731-.361-3.009-.548-3.009-1.187c0-.528.235-1.233 2.258-1.233c1.807 0 2.473.389 2.747 1.607a.254.254 0 0 0 .247.199h1.141a.26.26 0 0 0 .186-.081a.26.26 0 0 0 .067-.196c-.177-2.098-1.571-3.076-4.388-3.076c-2.508 0-4.004 1.058-4.004 2.833c0 1.925 1.488 2.457 3.895 2.695c2.88.282 3.103.703 3.103 1.269c0 .983-.789 1.402-2.642 1.402c-2.327 0-2.839-.584-3.011-1.742a.255.255 0 0 0-.253-.215h-1.137a.25.25 0 0 0-.254.253c0 1.482.806 3.248 4.655 3.248c2.788.001 4.386-1.096 4.386-3.013' },
+      python: { color: '#3776ab', path: 'm14.25.18l.9.2l.73.26l.59.3l.45.32l.34.34l.25.34l.16.33l.1.3l.04.26l.02.2l-.01.13V8.5l-.05.63l-.13.55l-.21.46l-.26.38l-.3.31l-.33.25l-.35.19l-.35.14l-.33.1l-.3.07l-.26.04l-.21.02H8.77l-.69.05l-.59.14l-.5.22l-.41.27l-.33.32l-.27.35l-.2.36l-.15.37l-.1.35l-.07.32l-.04.27l-.02.21v3.06H3.17l-.21-.03l-.28-.07l-.32-.12l-.35-.18l-.36-.26l-.36-.36l-.35-.46l-.32-.59l-.28-.73l-.21-.88l-.14-1.05l-.05-1.23l.06-1.22l.16-1.04l.24-.87l.32-.71l.36-.57l.4-.44l.42-.33l.42-.24l.4-.16l.36-.1l.32-.05l.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75l-.02-.37l.05-.34l.11-.31l.17-.28l.25-.26l.31-.23l.38-.2l.44-.18l.51-.15l.58-.12l.64-.1l.71-.06l.77-.04l.84-.02l1.27.05zm-6.3 1.98l-.23.33l-.08.41l.08.41l.23.34l.33.22l.41.09l.41-.09l.33-.22l.23-.34l.08-.41l-.08-.41l-.23-.33l-.33-.22l-.41-.09l-.41.09zm13.09 3.95l.28.06l.32.12l.35.18l.36.27l.36.35l.35.47l.32.59l.28.73l.21.88l.14 1.04l.05 1.23l-.06 1.23l-.16 1.04l-.24.86l-.32.71l-.36.57l-.4.45l-.42.33l-.42.24l-.4.16l-.36.09l-.32.05l-.24.02l-.16-.01h-8.22v.82h5.84l.01 2.76l.02.36l-.05.34l-.11.31l-.17.29l-.25.25l-.31.24l-.38.2l-.44.17l-.51.15l-.58.13l-.64.09l-.71.07l-.77.04l-.84.01l-1.27-.04l-1.07-.14l-.9-.2l-.73-.25l-.59-.3l-.45-.33l-.34-.34l-.25-.34l-.16-.33l-.1-.3l-.04-.25l-.02-.2l.01-.13v-5.34l.05-.64l.13-.54l.21-.46l.26-.38l.3-.32l.33-.24l.35-.2l.35-.14l.33-.1l.3-.06l.26-.04l.21-.02l.13-.01h5.84l.69-.05l.59-.14l.5-.21l.41-.28l.33-.32l.27-.35l.2-.36l.15-.36l.1-.35l.07-.32l.04-.28l.02-.21V6.07h2.09l.14.01zm-6.47 14.25l-.23.33l-.08.41l.08.41l.23.33l.33.23l.41.08l.41-.08l.33-.23l.23-.33l.08-.41l-.08-.41l-.23-.33l-.33-.23l-.41-.08l-.41.08z' },
+      django: { color: '#44b78b', path: 'M11.146 0h3.924v18.166c-2.013.382-3.491.535-5.096.535c-4.791 0-7.288-2.166-7.288-6.32c0-4.002 2.65-6.6 6.753-6.6c.637 0 1.121.05 1.707.203zm0 9.143a3.9 3.9 0 0 0-1.325-.204c-1.988 0-3.134 1.223-3.134 3.365c0 2.09 1.096 3.236 3.109 3.236c.433 0 .79-.025 1.35-.102V9.142zM21.314 6.06v9.098c0 3.134-.229 4.638-.917 5.937c-.637 1.249-1.478 2.039-3.211 2.905l-3.644-1.733c1.733-.815 2.574-1.53 3.109-2.625c.561-1.121.739-2.421.739-5.835V6.059zM17.39.021h3.924v4.026H17.39z' },
+      flask: { color: '#3babc3', path: 'M10.773 2.878c-.013 1.434.322 4.624.445 5.734l-8.558 3.83c-.56-.959-.98-2.304-1.237-3.38l-.06.027c-.205.09-.406.053-.494-.088l-.011-.018l-.82-1.506c-.058-.105-.05-.252.024-.392a.78.78 0 0 1 .358-.331l9.824-4.207c.146-.064.299-.063.4.004c.106.062.127.128.13.327m.68 7c.523 1.97.675 2.412.832 2.818l-7.263 3.7a19.4 19.4 0 0 1-1.81-2.83zm12.432 8.786h.003c.283.402-.047.657-.153.698l-.947.37c.037.125.035.319-.217.414l-.736.287c-.229.09-.398-.059-.42-.2l-.025-.125c-4.427 1.784-7.94 1.685-10.696.647c-1.981-.745-3.576-1.983-4.846-3.379l6.948-3.54c.721 1.431 1.586 2.454 2.509 3.178c2.086 1.638 4.415 1.712 5.793 1.563l-.047-.233c-.015-.077.007-.135.086-.165l.734-.288a.3.3 0 0 1 .342.086l.748-.288a.31.31 0 0 1 .341.086z' },
+      fastapi: { color: '#05998b', path: 'M12 .039c-6.627 0-12 5.354-12 11.96c-.001 6.606 5.372 11.963 12 11.962S24.001 18.605 24 12S18.627.039 12 .039m-.829 5.415h7.55l-7.58 5.329h5.182L5.28 18.543l5.891-13.088' },
+      express: { color: '#8b93a7', path: 'M12.262 16.666h1.146l6.975-9.325H19.22zm9.778 1.441v.004l-4.334-5.706l-.557.74l4.873 6.682H.945V4.173h9.505l5.026 6.7l.574-.772l-4.374-5.928h.003l-.719-.945H0v17.544h24zM10.917 8.705a3.8 3.8 0 0 0-1.292-1.183q-.796-.45-1.916-.45c-.746 0-1.37.14-1.906.424a3.76 3.76 0 0 0-1.31 1.12a4.9 4.9 0 0 0-.75 1.581a7.17 7.17 0 0 0 0 3.696c.148.567.402 1.101.75 1.573a3.5 3.5 0 0 0 1.31 1.066q.803.39 1.906.389q1.77 0 2.739-.868q.966-.867 1.328-2.457h-1.139q-.271 1.084-.977 1.734q-.704.651-1.952.65q-.812 0-1.392-.342a3.1 3.1 0 0 1-.957-.869a3.5 3.5 0 0 1-.551-1.182a5 5 0 0 1-.17-1.133a9 9 0 0 0-.015-.286a4.5 4.5 0 0 1 .015-.829c.047-.418.147-.83.296-1.223A3.7 3.7 0 0 1 5.54 9.05a2.9 2.9 0 0 1 .922-.742q.541-.28 1.246-.28c.47 0 .869.093 1.23.28q.541.281.922.742q.379.461.587 1.057t.225 1.246H5.625l.004.957h6.182a7.3 7.3 0 0 0-.18-1.924a4.9 4.9 0 0 0-.715-1.68' },
+      java: { color: '#e76f00', path: 'M11.915 0L11.7.215C9.515 2.4 7.47 6.39 6.046 10.483c-1.064 1.024-3.633 2.81-3.711 3.551c-.093.87 1.746 2.611 1.55 3.235c-.198.625-1.304 1.408-1.014 1.939c.1.188.823.011 1.277-.491a13.4 13.4 0 0 0-.017 2.14c.076.906.27 1.668.643 2.232c.372.563.956.911 1.667.911c.397 0 .727-.114 1.024-.264c.298-.149.571-.33.91-.5c.68-.34 1.634-.666 3.53-.604c1.903.062 2.872.39 3.559.704s1.15.664 1.925.664c.767 0 1.395-.336 1.807-.9c.412-.563.631-1.33.72-2.24c.06-.623.055-1.32 0-2.066c.454.45 1.117.604 1.213.424c.29-.53-.816-1.314-1.013-1.937c-.198-.624 1.642-2.366 1.549-3.236c-.08-.748-2.707-2.568-3.748-3.586C16.428 6.374 14.308 2.394 12.13.215zm.175 6.038a2.95 2.95 0 0 1 2.943 2.942a2.95 2.95 0 0 1-2.943 2.943A2.95 2.95 0 0 1 9.148 8.98a2.95 2.95 0 0 1 2.942-2.942M8.685 7.983a3.5 3.5 0 0 0-.145.997c0 1.951 1.6 3.55 3.55 3.55s3.55-1.598 3.55-3.55q-.002-.495-.132-.951q.502.143.915.336a43 43 0 0 1 2.042 5.829c.678 2.545 1.01 4.92.846 6.607c-.082.844-.29 1.51-.606 1.94c-.315.431-.713.651-1.315.651c-.593 0-.932-.27-1.673-.61c-.741-.338-1.825-.694-3.792-.758c-1.974-.064-3.073.293-3.821.669c-.375.188-.659.373-.911.5s-.466.2-.752.2c-.53 0-.876-.209-1.16-.64c-.285-.43-.474-1.101-.545-1.948c-.141-1.693.176-4.069.823-6.614a43 43 0 0 1 1.934-5.783c.348-.167.749-.31 1.192-.425m-3.382 4.362a.2.2 0 0 1 .13.031c-.166.56-.323 1.116-.463 1.665a34 34 0 0 0-.547 2.555a4 4 0 0 0-.2-.39c-.58-1.012-.914-1.642-1.16-2.08c.315-.24 1.679-1.755 2.24-1.781m13.394.01c.562.027 1.926 1.543 2.24 1.783c-.246.438-.58 1.068-1.16 2.08a4 4 0 0 0-.163.309a32 32 0 0 0-.562-2.49a41 41 0 0 0-.482-1.652a.2.2 0 0 1 .127-.03' },
+      go: { color: '#00add8', path: 'M1.811 10.231c-.047 0-.058-.023-.035-.059l.246-.315c.023-.035.081-.058.128-.058h4.172c.046 0 .058.035.035.07l-.199.303c-.023.036-.082.07-.117.07zM.047 11.306c-.047 0-.059-.023-.035-.058l.245-.316c.023-.035.082-.058.129-.058h5.328c.047 0 .07.035.058.07l-.093.28c-.012.047-.058.07-.105.07zm2.828 1.075c-.047 0-.059-.035-.035-.07l.163-.292c.023-.035.07-.07.117-.07h2.337c.047 0 .07.035.07.082l-.023.28c0 .047-.047.082-.082.082zm12.129-2.36c-.736.187-1.239.327-1.963.514c-.176.046-.187.058-.34-.117c-.174-.199-.303-.327-.548-.444c-.737-.362-1.45-.257-2.115.175c-.795.514-1.204 1.274-1.192 2.22c.011.935.654 1.706 1.577 1.835c.795.105 1.46-.175 1.987-.77c.105-.13.198-.27.315-.434H10.47c-.245 0-.304-.152-.222-.35c.152-.362.432-.97.596-1.274a.32.32 0 0 1 .292-.187h4.253c-.023.316-.023.631-.07.947a5 5 0 0 1-.958 2.29c-.841 1.11-1.94 1.8-3.33 1.986c-1.145.152-2.209-.07-3.143-.77c-.865-.655-1.356-1.52-1.484-2.595c-.152-1.274.222-2.419.993-3.424c.83-1.086 1.928-1.776 3.272-2.02c1.098-.2 2.15-.07 3.096.571c.62.41 1.063.97 1.356 1.648c.07.105.023.164-.117.2m3.868 6.461c-1.064-.024-2.034-.328-2.852-1.029a3.67 3.67 0 0 1-1.262-2.255c-.21-1.32.152-2.489.947-3.529c.853-1.122 1.881-1.706 3.272-1.95c1.192-.21 2.314-.095 3.33.595c.923.63 1.496 1.484 1.648 2.605c.198 1.578-.257 2.863-1.344 3.962c-.771.783-1.718 1.273-2.805 1.495c-.315.06-.63.07-.934.106m2.78-4.72c-.011-.153-.011-.27-.034-.387c-.21-1.157-1.274-1.81-2.384-1.554c-1.087.245-1.788.935-2.045 2.033c-.21.912.234 1.835 1.075 2.21c.643.28 1.285.244 1.905-.07c.923-.48 1.425-1.228 1.484-2.233z' },
+      nginx: { color: '#009639', path: 'M12 0L1.605 6v12L12 24l10.395-6V6zm6 16.59c0 .705-.646 1.29-1.529 1.29c-.631 0-1.351-.255-1.801-.81l-6-7.141v6.66c0 .721-.57 1.29-1.274 1.29H7.32c-.721 0-1.29-.6-1.29-1.29V7.41c0-.705.63-1.29 1.5-1.29c.646 0 1.38.255 1.83.81l5.97 7.141V7.41c0-.721.6-1.29 1.29-1.29h.075c.72 0 1.29.6 1.29 1.29v9.18z' },
+      // New API — not in simple-icons; a router glyph in the project's blue
+      newapi: { color: '#5b8def', path: 'M12 1.8a10.2 10.2 0 1 0 0 20.4 10.2 10.2 0 0 0 0-20.4Zm1.1 4.4v6.3l4.4 2.6-1.1 1.9-4.4-2.6-4.4 2.6-1.1-1.9 4.4-2.6V6.2h2.2Zm-1.1-2.2a8 8 0 1 1 0 16 8 8 0 0 1 0-16Z' },
+      // DSH — not in simple-icons; the harness's blue dot in a ring
+      dsh: { color: '#4d6bfe', path: 'M12 1.8a10.2 10.2 0 1 0 0 20.4 10.2 10.2 0 0 0 0-20.4Zm0 3.4c1.6 2 3.4 4.6 3.4 6.8 0 1.9-1.5 3.4-3.4 3.4s-3.4-1.5-3.4-3.4c0-2.2 1.8-4.8 3.4-6.8Zm-4.6 12c1.2.9 2.9 1.4 4.6 1.4s3.4-.5 4.6-1.4l1.3 1.7c-1.7 1.3-3.8 2-5.9 2s-4.2-.7-5.9-2l1.3-1.7Z' },
+      // A workspace file with no server behind it
+      static: { color: '#8b8b8b', path: 'M3.6 3.6h16.8v16.8H3.6V3.6Zm2.1 2.1v12.6h12.6V5.7H5.7Z' },
     }
 
     function StackMark(props) {
@@ -644,7 +662,11 @@ window.__ModuleLoader__.load({
           height: 14,
           viewBox: '0 0 24 24',
           'aria-hidden': 'true',
-          style: { flex: '0 0 auto', fill: mark.color },
+          style: mark.stroke
+            // Line-art logos are drawn with strokes. Filling them instead paints the
+            // orbits into one solid blob rather than three rings.
+            ? { flex: '0 0 auto', fill: 'none', stroke: mark.color, strokeWidth: 1.4, strokeLinejoin: 'round' }
+            : { flex: '0 0 auto', fill: mark.color },
         },
         h('path', { d: mark.path }),
       )
@@ -796,7 +818,7 @@ window.__ModuleLoader__.load({
      * @returns the menu button and its popover.
      */
     function PanelMenu(props) {
-      const { servers, pages, onOpen, onDetect, detecting, onReload, onReloadFrame, onClearAll, count, accent, onAccent, hasPreview } = props
+      const { servers, pages, onOpen, onDetect, detecting, onClearAll, count, accent, onAccent } = props
       const [open, setOpen] = React.useState(false)
       const ref = React.useRef(null)
 
@@ -836,12 +858,10 @@ window.__ModuleLoader__.load({
           ? h(
               'div',
               { className: 'dsa-menu', role: 'menu' },
-              // Reload is a refresh, and is labelled as one: "reload" described an
-              // action the reader had no reason to expect to differ from refreshing.
-              hasPreview
-                ? h(MenuRow, { icon: 'refresh', label: t('panel.refresh'), onClick: () => { setOpen(false); onReloadFrame() } })
-                : null,
-              h(MenuRow, { icon: 'radar', label: detecting ? t('panel.detecting') : t('panel.detectLong'), disabled: detecting, onClick: () => { setOpen(false); onDetect() } }),
+              // Detect deliberately does NOT close the menu: the results land in this
+              // same menu, so closing it would hide the thing the reader just asked
+              // for and force them to re-open it. It stays open and fills in.
+              h(MenuRow, { icon: 'radar', label: detecting ? t('panel.detecting') : t('panel.detectLong'), disabled: detecting, onClick: () => { onDetect() } }),
               count
                 ? h(MenuRow, { icon: 'eraser', label: t('panel.clearAll'), onClick: () => { setOpen(false); onClearAll() } })
                 : null,
@@ -1446,7 +1466,10 @@ window.__ModuleLoader__.load({
             }
             nonce.current += 1
             setAnnotations([])
-            setPreview({ origin: data.origin, url: data.url, sid: data.sid, nonce: nonce.current })
+            // `target` is kept so a reload can re-open the same page. It is the
+            // reader's own input for a loopback address and the file's url for a
+            // workspace page — either way it is what `/open` must be asked for again.
+            setPreview({ origin: data.origin, url: data.url, sid: data.sid, nonce: nonce.current, target })
             setMode('idle')
           } catch (error) {
             flash(String((error && error.message) || error))
@@ -1588,18 +1611,39 @@ window.__ModuleLoader__.load({
         // Two rows at most, and the second only exists before a page is open.
         // Everything that is not used on every visit lives behind the menu, so the
         // frame gets the height instead of the chrome.
+        /**
+         * Reload the preview by re-opening it, rather than re-pointing the iframe.
+         *
+         * Bumping a nonce on the existing URL only re-mounts the iframe. That works for
+         * a workspace file, which is read from disk each time — but a loopback page is
+         * served through an ephemeral proxy that the host closes once the preview goes
+         * idle. Re-mounting then navigates to a dead port and the reader gets
+         * "localhost 拒绝连接" instead of a refreshed page.
+         *
+         * Going back through `/open` reuses a live proxy and builds a fresh one when the
+         * old is gone, so reload means the same thing either way.
+         */
+        const reloadPreview = async () => {
+          const current = preview
+          if (!current) return
+          const target = current.target || current.url
+          if (target) {
+            await openTarget(target)
+            return
+          }
+          setPreview((live) => (live ? { ...live, nonce: ++nonce.current } : live))
+        }
+
         const menu = h(PanelMenu, {
           servers,
           pages,
           onOpen: openTarget,
           onDetect,
           detecting,
-          onReloadFrame: () => setPreview((current) => (current ? { ...current, nonce: ++nonce.current } : current)),
           onClearAll: () => void clearAll(),
           count: annotations.length,
           accent,
           onAccent: changeAccent,
-          hasPreview: Boolean(preview),
         })
 
         return h(
@@ -1633,6 +1677,25 @@ window.__ModuleLoader__.load({
                 })
               : null,
             h('span', { className: 'dsa-spacer' }),
+            // Refresh sits beside the overflow menu rather than inside it.
+            //
+            // It is the one action a reader reaches for repeatedly while a page is
+            // open, and burying a frequent action behind a click makes it feel
+            // unavailable. An icon button costs the toolbar almost no width, and it
+            // only appears when there is a page to refresh.
+            preview
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'dsa-btn dsa-icon-btn',
+                    onClick: () => void reloadPreview(),
+                    title: t('panel.refresh'),
+                    'aria-label': t('panel.refresh'),
+                  },
+                  h(Icon, { name: 'refresh' }),
+                )
+              : null,
             menu,
           ),
 

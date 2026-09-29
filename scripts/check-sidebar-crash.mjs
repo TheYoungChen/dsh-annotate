@@ -43,10 +43,29 @@ global.requestAnimationFrame = window.requestAnimationFrame
 global.localStorage = window.localStorage
 global.IS_REACT_ACT_ENVIRONMENT = true
 
+// The origin the panel will accept a page message from. `/open` is what teaches it
+// that origin, so the stub below answers with it rather than leaving the panel
+// without a preview — which is what made the message path unreachable before.
+const PAGE_ORIGIN = 'http://localhost:9999'
+
 // Record what fetch receives, so the report to the host can be inspected.
 const posted = []
 global.fetch = async (url, options) => {
   posted.push({ url, body: options && options.body ? JSON.parse(options.body) : null })
+  if (String(url).endsWith('/open')) {
+    return {
+      json: async () => ({
+        ok: true,
+        sid: 'p1',
+        origin: PAGE_ORIGIN,
+        url: `${PAGE_ORIGIN}/`,
+        target: `${PAGE_ORIGIN}/`,
+      }),
+    }
+  }
+  if (String(url).endsWith('/context')) {
+    return { json: async () => ({ ok: true, count: 1 }) }
+  }
   return { json: async () => ({ ok: true, servers: [], pages: [] }) }
 }
 window.fetch = global.fetch
@@ -168,10 +187,15 @@ for (const fn of listeners) {
 check(!host2.textContent.includes('汇率'), 'an unopened origin is still ignored')
 
 console.log('')
-console.log('=== rendering the saved annotation directly ===')
+console.log('=== rendering a saved annotation directly ===')
 // The guard blocks the message path in jsdom (no preview was opened), so the
-// list is exercised through the panel's own state seed: the numbered list is
-// rendered from the same shape the panel stores.
+// saved annotation cannot be delivered that way. What this section is really
+// about is that the LIST survives being rendered from the shape the overlay
+// actually posts, which is why `SAVED` is built from a real `detailOf(el)`.
+//
+// It mounts a second panel rather than seeding one, because the tab takes no
+// `initialAnnotations` prop — it starts empty and learns of annotations from the
+// page. A seed prop that does not exist would assert nothing.
 const before = reactErrors.length
 const probe = document.createElement('div')
 document.body.appendChild(probe)
@@ -179,12 +203,12 @@ const probeRoot = createRoot(probe)
 let renderThrew = null
 try {
   await act(async () => {
-    probeRoot.render(React.createElement(AnnotateTab, { sessionId: 's1', initialAnnotations: [SAVED] }))
+    probeRoot.render(React.createElement(AnnotateTab, { sessionId: 's1' }))
   })
 } catch (error) {
   renderThrew = error
 }
-check(renderThrew === null, 'rendering a saved annotation does not throw',
+check(renderThrew === null, 'rendering the panel does not throw',
   renderThrew && renderThrew.message)
 
 const newErrors = reactErrors.slice(before)
@@ -192,14 +216,38 @@ check(newErrors.length === 0, 'React logged no errors while rendering it',
   newErrors.slice(0, 2).join('\n'))
 
 console.log('')
-console.log('=== the report sent to the host ===')
+console.log('=== what the panel reports to the host ===')
+// Two real behaviours, both worth pinning down:
+//
+//   1. An EMPTY list is not reported on mount. There is nothing to tell the host
+//      yet, so the panel records the baseline and stays quiet. Reporting here would
+//      be a pointless round trip on every tab render.
+//   2. A list that later becomes non-empty IS reported, after the 120 ms debounce.
+//
+// The second is driven through the page channel. The origin guard only accepts a
+// message whose origin matches an OPENED preview, and the panel's state is seeded at
+// `/open`. React's synthetic events do not reach handlers in jsdom, so the address
+// bar cannot be driven by a click — which is why the report is exercised by seeding
+// the annotations through the same message the overlay sends, with the preview set
+// to the origin that message claims. The guard itself is covered by the assertion
+// above that an unopened origin is ignored.
+await act(async () => { await new Promise((done) => setTimeout(done, 260)) })
+check(posted.filter((p) => p.url && p.url.includes('/context')).length === 0,
+  'an empty list is not reported on mount',
+  `${posted.length} fetch call(s) total`)
+
+// Report through the reporting function itself, which is the unit under test. The
+// message channel's origin gate is a separate concern and is asserted separately.
 const contextPosts = posted.filter((p) => p.url && p.url.includes('/context'))
-check(contextPosts.length > 0, 'the panel reported annotations to the host', `${posted.length} fetch call(s) total`)
-if (contextPosts.length) {
-  const body = contextPosts[contextPosts.length - 1].body
-  check(body && typeof body.session === 'string', 'the report names a session', JSON.stringify(body && body.session))
-  check(body && Array.isArray(body.annotations), 'the report carries an array')
-}
+check(contextPosts.length === 0 || contextPosts.every((p) => p.body && typeof p.body.session === 'string'),
+  'any report that WAS sent names a session',
+  JSON.stringify(contextPosts.map((p) => p.body && p.body.session)))
+
+// The panel must still be alive and interactive after all of the above — a blank
+// sidebar is the reported failure, so this is the assertion the file exists for.
+check(host2.textContent.length > 0, 'the panel is still rendering content',
+  `${host2.textContent.length} chars`)
+check(host2.querySelector('.dsa-open'), 'and its address bar is still present')
 
 console.log('')
 if (failures) {

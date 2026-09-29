@@ -26,6 +26,25 @@ tmp/
 coverage/
 .nyc_output/
 
+# A contact sheet of the stack marks, rendered by scripts/render-stack-marks.mjs so the
+# eighteen logos can be eyeballed at their real 14px size. It is a thing to look at
+# while working, not a thing to ship: the marks themselves live in client.js, and the
+# check that every stack has one is scripts/check-detection.mjs.
+assets/.stack-marks-check.png
+
+# Animated GIFs are not stored here.
+#
+# GIF stores every frame as a complete bitmap with no inter-frame compression, so a
+# ten-second clip that is 1.6 MB as video becomes 30 MB as GIF — twenty times the size
+# for a worse-looking result. `assets/demo.mp4` carries the same clip at the smaller
+# size and IS committed, deliberately: it is the fallback for anyone who cannot play
+# the GitHub attachment, and 1.6 MB is a reasonable thing for a clone to carry.
+#
+#   git check-ignore -v assets/demo.mp4   # must NOT match
+assets/*.gif
+assets/*.mov
+assets/*.mkv
+
 # The superseded Chrome-extension implementation. It stays on the machines that
 # already have it, but it is not part of this repository: the parts of it still
 # worth reading live in docs/ (the element-fact collector and design notes).

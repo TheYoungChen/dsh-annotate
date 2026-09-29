@@ -327,6 +327,52 @@ const cases = [
     mutate: 'path-ends-at-ancestor',
     expect: /resolves to the bold itself|does not resolve to \.l2/i,
   },
+  {
+    // The real accident: a splice script matched the wrong closing brace and replaced
+    // the first ~600 lines of `client.js`. The file still parsed, still had every
+    // component, and still contained the strings the other checks look for — twelve
+    // of fourteen tests went on passing. This is the case that must never be silent.
+    name: 'the client bundle loses its head',
+    script: 'check-structure.mjs',
+    apply: (dir) => {
+      const p = join(dir, 'client.js')
+      const lines = readFileSync(p, 'utf8').split('\n')
+      writeFileSync(p, [
+        '    const STACK_MARKS = {',
+        "      react: { color: '#61dafb', path: 'M12' },",
+        '    }',
+        '',
+        ...lines.slice(616),
+      ].join('\n'))
+    },
+    expect: /truncated|file header|module wrapper|braces balance/i,
+  },
+  {
+    // The gate that keeps the preview proxy from becoming a way to reach anything the
+    // host can reach. Opening it up is a security regression, not a behaviour change.
+    name: 'every preview target is allowed',
+    script: 'check-target-gate.mjs',
+    apply: (dir) => {
+      const p = join(dir, 'lib', 'index.js')
+      const src = readFileSync(p, 'utf8')
+      writeFileSync(p, src.replace('if (allowRemote) return true', 'if (true) return true'))
+    },
+    expect: /refused by default|reachable by default/i,
+  },
+  {
+    // The README once claimed the plugin could not annotate online sites, while
+    // `allowRemote` would in fact happily fetch any host. Documentation drifting away
+    // from a security control is its own class of bug — nobody notices, because
+    // nothing connects the sentence to the function.
+    name: 'the README denies a feature that exists',
+    script: 'check-target-gate.mjs',
+    apply: (dir) => {
+      const p = join(dir, 'README.md')
+      const src = readFileSync(p, 'utf8')
+      writeFileSync(p, src.replace('计划在后续版本开放', '这个插件做不了，因为它跑在 DSH 里面'))
+    },
+    expect: /cannot annotate online sites|做不了/i,
+  },
 ]
 
 let good = 0

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 安全漏洞
+    url: https://github.com/TheYoungChen/dsh-annotate/security/advisories/new
+    about: 不要开公开 issue，请用私密漏洞报告
+  - name: 先看看 README
+    url: https://github.com/TheYoungChen/dsh-annotate#readme
+    about: 安装、功能、常见问题大多在这里

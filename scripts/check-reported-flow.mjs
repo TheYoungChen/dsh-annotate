@@ -183,15 +183,24 @@ check(back.status === 200 && back.body && back.body.ok === true,
 check(back.body && back.body.sid === first.body.sid, 'and still reuses its preview')
 
 console.log('')
-console.log('=== step 7: opening pages does not disturb what is held ===')
-// Step 3 read the block, but reading does not clear it: the clear is tied to the
-// END of the turn, because an assembly can happen without becoming a message and
-// discarding the reader's annotations on a cancelled turn would be worse than one
-// extra step of context.
+console.log('=== step 7: opening pages does not resurrect a delivered batch ===')
+// Step 3 read the block through the hook, and reading IS delivery: the host releases
+// the batch at that moment, which is what lets the composer's capsule clear as soon
+// as the message goes out rather than when the reply finishes.
+//
+// So the correct assertion here is that the batch is GONE. It used to assert the
+// opposite — that the block survived to the end of the turn — and that expectation is
+// exactly what made the capsule linger after sending.
 const peek = await callHandler(handler, { method: 'POST', path: '/__dsh-annotate/pending', body: { session: 'session-under-test' } })
-check(peek.body && peek.body.count === 1, 'the block survives the step that delivered it',
+check(peek.body && peek.body.count === 0, 'the delivered batch was released',
   JSON.stringify(peek.body && peek.body.count))
-check(peek.body && peek.body.block === rendered, 'and still renders identically for inspection')
+check(peek.body && !peek.body.block, 'and renders nothing more',
+  JSON.stringify(peek.body && peek.body.block))
+// The release is reported, so a reader can see WHEN a batch went out and why. This is
+// the field that distinguishes "the clear never ran" from "it ran at the wrong moment".
+check(peek.body && (peek.body.released || []).some((one) => one.reason === 'delivered'),
+  'and the release is recorded as a delivery',
+  JSON.stringify(peek.body && peek.body.released))
 check(await attachedText(ctx, 'other') === '', 'another session still gets nothing')
 
 console.log('')
