@@ -208,6 +208,49 @@ console.log('\n=== the facts a reader needs before installing ===')
   }
 }
 
+console.log('\n=== no filler, no dangling references ===')
+{
+  // The README once carried "上面那张表讲了是什么，这里是实际长什么样。" — a sentence whose
+  // entire job was to announce that the next section exists. It also referred to a table
+  // that had already been deleted, so it pointed at nothing. Both are the same failure:
+  // words that carry no information, in a document whose whole value is information.
+  const lines = readme.split('\n')
+
+  const filler = [
+    /这里(就)?是实际长什么样/,
+    /下面(让)?我们(来看|看看)/,
+    /如上所述/,
+    /众所周知/,
+    /不言而喻/,
+    /接下来(让)?我们/,
+  ]
+  for (const pattern of filler) {
+    const hit = lines.findIndex((l) => pattern.test(l))
+    ok(hit === -1, `no filler line: ${pattern.source}`,
+      hit === -1 ? 'none' : `line ${hit + 1}: ${lines[hit].trim().slice(0, 40)}`)
+  }
+
+  // A relative reference to "the table above" is only valid if something above is a
+  // table. Checking the claim rather than trusting it is the whole point — this is the
+  // assertion that would have caught the deleted-table sentence.
+  const dangling = [/上面那张表/, /上面的表/, /上表/, /见上表/]
+  for (const pattern of dangling) {
+    if (!pattern.test(readme)) continue
+    const before = readme.slice(0, readme.search(pattern))
+    const hasTable = /^\|.*\|$/m.test(before)
+    ok(hasTable, `"${pattern.source}" is backed by an actual table above`)
+  }
+
+  // Every relative link and image must resolve to a file that exists.
+  const refs = [...readme.matchAll(/\]\(([^)#][^)]*)\)/g)].map((m) => m[1])
+    .concat([...readme.matchAll(/src="([^"]+)"/g)].map((m) => m[1]))
+  const missing = refs
+    .filter((r) => !/^https?:|^mailto:|^#/.test(r))
+    .filter((r) => !existsSync(`${root}${r.split('#')[0]}`))
+  ok(missing.length === 0, 'every relative link and image resolves',
+    missing.length ? missing.join(', ') : `${refs.length} checked`)
+}
+
 console.log('\n=== no decorative emoji ===')
 {
   // Arrows are kept: they carry meaning in the flow diagram and in "click → hover →

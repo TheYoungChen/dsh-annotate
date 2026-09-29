@@ -89,10 +89,7 @@ AI 拿到的是 `.lb-hero` 和它的真实文本，不是一句模糊描述。
 
 ## 三个特色
 
-上面那张表讲了是什么，这里是实际长什么样。
-
-> 截图都是真实运行时的画面。要看每张怎么截出来的，见
-> [`assets/README.md`](assets/README.md)。
+下面三张都是实际运行时的截图。
 
 ### 1. 本地服务发现 —— 不用先记住端口号
 
@@ -110,7 +107,7 @@ AI 拿到的是 `.lb-hero` 和它的真实文本，不是一句模糊描述。
 是 2px 描边"、"是 6px 的圆点"、"是背后有白字的实心针"三种形态，还要在浅色和深色
 主题下都够清楚。预设的 6 种全部通过 WCAG AA，选完立刻生效，不需要刷新。
 
-左边蓝色色，右边换成橙色 —— 换的是标记的颜色，页面本身没有动。
+左边是蓝色，右边换成橙色 —— 换的是标记的颜色，页面本身没有动。
 
 <img src="assets/shot-accent.png" alt="标注配色：6 种预设，全部满足 WCAG AA 对比度" width="100%">
 
@@ -381,6 +378,7 @@ node scripts/mutate.mjs . restore
 ## 文档
 
 - [`CHANGELOG.md`](CHANGELOG.md) —— 每个版本用户可见的变化
+- [`assets/README.md`](assets/README.md) —— 截图与演示视频的来源，以及重新生成的步骤
 - `docs/compatibility.md` —— DSH 版本兼容声明、依据，以及尚未完成的运行验收步骤
 - `docs/design-principles.md` —— 设计原则
 - `docs/reference-element-facts.ts` —— 元素信息采集参考实现（ARIA role 映射等），
