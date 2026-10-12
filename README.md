@@ -418,7 +418,7 @@ node scripts/check-preview-login.mjs      # 预览 iframe 与宿主同 site，�
 node scripts/check-tabs.mjs               # 多标签页：加页面而不是换页面、标记按页面分、关页面留标记、地址栏入住工具栏那一行
 node scripts/check-preview-reuse.mjs      # 预览复用身份：同应用不同路由、同目录不同文件都是两个预览
 node scripts/check-tabs-dom.mjs           # 真的渲染一遍面板数标签：点 + 能开出同应用的第二个页面；关一个剩一个
-node scripts/check-release.mjs            # 更新日志两份都在：CHANGELOG 有这一版、Release 正文存在且写的是这一版
+node scripts/check-release.mjs            # 更新日志直接当发布说明：没有内部脚本名、没有"读者报告"式转述、不是空壳
 
 # 变异检测前先自检：每个变异都带一个字面锚点，源码一改就可能失配；
 # 失配时变异根本没注入，受检代码等于好代码，"通过"是假的

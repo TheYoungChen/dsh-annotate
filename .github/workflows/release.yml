@@ -1,19 +1,19 @@
 name: Release
 
-# 推送一个形如 v0.3.0 的标签时，自动建/更新对应的 GitHub Release，
-# 正文取自 docs/releases/v0.3.0.md。
+# 推送形如 v0.3.0 的标签时，自动创建/更新对应的 GitHub Release，
+# 正文取自 CHANGELOG.md 里 `## 0.3.0` 那一节。
 #
-# 这样做的理由：本地没有 gh CLI、也不该把 token 放在机器上，而 Release 需要凭据。
-# 放到 Actions 里跑，凭据由 GitHub 自己提供（内置的 GITHUB_TOKEN），本地只要
-# `git push origin v0.3.0`，Release 页面就自动带着完整更新日志出现。
+# 为什么放在 Actions 里：创建 Release 需要凭据，而本地不应该存 token，
+# 也不该要求每个维护者都装 gh CLI。凭据由 GitHub 自己提供（内置的 GITHUB_TOKEN），
+# 本地只需要 `git push origin v0.3.0`，Release 页面就带着完整的更新日志出现。
 #
-# 为什么正文单独一份文件、而不是从 CHANGELOG.md 切一段：
-# CHANGELOG 是写给改这个插件的人看的（含"测试工具""变异锚点"这类内部细节），
-# Release 是写给用它的人看的。两者的取舍不同，硬让一份兼任会两边都别扭。
-# 对应地，`node scripts/check-release.mjs` 会断言两者都覆盖到了当前版本号 ——
-# 少写其中一份不会静静地过去。
+# 为什么正文取自 CHANGELOG.md 而不是另写一份：
+# 同一段改动写两遍，早晚会分叉，而分叉的那一份是别人正在读的那一份。
+# 所以只有一份：CHANGELOG.md 的当前版本小节就是 Release 正文，两边天然一致。
+# 代价是这一节要写给外面的人看 —— 不写"我在写注释时……"这类只有维护者关心的过程，
+# 也不写内部测试细节。那些属于提交信息，不属于更新日志。
 #
-# 找不到正文文件就让这一步失败，而不是发一个空正文的 Release：
+# 找不到对应小节就让这一步失败，而不是发一个空正文的 Release：
 # 空正文比没有更糟，它会看起来像"这一版没有改动"。
 
 on:
@@ -30,20 +30,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Find this version's release notes
+      - name: Take this version's section out of the changelog
         id: notes
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          file="docs/releases/v$version.md"
-          if [ ! -f "$file" ]; then
-            echo "::error::$file does not exist — write the release notes before tagging"
+          # 从 `## <version>` 那一行开始，到下一个 `## ` 之前。
+          awk -v want="## $version" '
+            $0 == want { inside = 1; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::CHANGELOG.md has no '## $version' section for tag $GITHUB_REF_NAME"
             exit 1
           fi
-          echo "file=$file" >> "$GITHUB_OUTPUT"
-          echo "--- $file ---"
-          cat "$file"
 
       - name: Create or update the release
         env:
@@ -51,10 +53,8 @@ jobs:
         run: |
           set -euo pipefail
           version="${{ steps.notes.outputs.version }}"
-          file="${{ steps.notes.outputs.file }}"
           if gh release view "v$version" >/dev/null 2>&1; then
-            gh release edit "v$version" --title "v$version" --notes-file "$file"
+            gh release edit "v$version" --title "v$version" --notes-file notes.md
           else
-            gh release create "v$version" --title "v$version" --notes-file "$file"
+            gh release create "v$version" --title "v$version" --notes-file notes.md
           fi
-
