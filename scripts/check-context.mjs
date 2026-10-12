@@ -69,16 +69,29 @@ check(/createUserMessage\(text, \{/.test(src), 'it builds a user-role message')
 console.log('\n--- the block is not user text ---')
 // The payload must be built by the host and delivered through the message
 // channel. If the client ever writes it into the draft, the reader sees it.
+//
+// The client does now mention the heading, because the transcript chip reads the
+// delivered block back to show what a sent message carried. That is a read, not a
+// write, and reading is precisely what must not be confused with the regression
+// here — so this asserts the heading never reaches the composer, which is the
+// surface that actually mattered.
 const clientSrc = await (await import('node:fs/promises')).readFile(fileURLToPath(new URL('../client.js', import.meta.url)), 'utf8')
 check(/Web page elements/.test(src), 'the host renders the "# Web page elements" block')
-check(!/Web page elements/.test(clientSrc), 'the client does not render that block into the composer')
+const composerStart = clientSrc.indexOf('function AnnotationCapsule')
+// Ended at the next top-level declaration rather than at a named function: what
+// matters is that this slice covers the capsule and stops at its end, so a later
+// addition between the two cannot be mistaken for part of the capsule.
+const composerEnd = clientSrc.indexOf('\n    function ', composerStart + 1)
+const composerSrc = composerStart === -1 ? '' : clientSrc.slice(composerStart, composerEnd)
+check(composerSrc !== '' && !/Web page elements/.test(composerSrc),
+  'the composer capsule never renders that block')
 
 console.log('\n--- payload shape ---')
 // Assert the shape the renderer produces, not the statements it is written
 // with: the wording of the block is checked for real in check-block.mjs, which
 // drives the shipped function. These only confirm the host owns all of it.
 check(/# Web page elements/.test(src), 'block starts with a heading')
-check(/## Element \$\{/.test(src), 'elements are numbered sections')
+check(/Element \$\{inner\.length \+ 1\}/.test(src), 'elements are numbered sections')
 check(/note: \$\{clip\(note, 600\)\}/.test(src), 'a note is clipped and emitted')
 check(/matches > 1 \? entry\.at\.trim\(\) : ''/.test(src), 'geometry is gated on an ambiguous selector')
 

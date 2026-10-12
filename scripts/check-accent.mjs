@@ -285,7 +285,13 @@ console.log('=== an opened page is told the accent ===')
 // not reach handlers in jsdom (a limitation this suite has hit repeatedly), so a
 // click-based assertion here would fail for a reason unrelated to the accent and
 // I would be tuning the test until it went green.
-const openSrc = src.slice(src.indexOf('const openTarget = async (target)'), src.indexOf('const setPageMode'))
+// Anchored without the parameter list: the function gains options over time (it
+// carries `keepMarks` for the reopen path), and an anchor that spells out the old
+// signature silently slices from -1 — which reads as "no accent found" rather than
+// "the anchor went stale".
+const openStart = src.indexOf('const openTarget = async (')
+const openSrc = openStart === -1 ? '' : src.slice(openStart, src.indexOf('const setPageMode'))
+check(openStart !== -1, 'the open path is still locatable in the bundle')
 check(/accent/.test(openSrc),
   'the open request sends the accent to the host',
   openSrc.match(/body: JSON\.stringify\([^)]*\)/)?.[0] || '(no body found)')

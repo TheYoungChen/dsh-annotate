@@ -36,14 +36,36 @@ console.log('--- the shipped mapping ---')
 console.log(mapper.split('\n').map((l) => `    ${l.trim()}`).join('\n'))
 
 /**
+ * Lift a top-level `function name(...) { ... }` from the bundle by name.
+ *
+ * The mapper now orders its output through the panel's own helpers — the host
+ * numbers the block's `## Element n` headings by position in the array, so
+ * sending arrival order made the block disagree with the panel and the pins.
+ * Those helpers are therefore part of the shipped expression under test and are
+ * lifted with it, rather than stubbed: a stub would let the real one drift.
+ * @param name - the function to extract.
+ * @returns its source, closing brace included.
+ */
+const liftFunction = (name) => {
+  const at = src.indexOf(`function ${name}(`)
+  if (at === -1) throw new Error(`the bundle no longer defines ${name}`)
+  // The body's closing brace is the first `\n    }` after the opening line.
+  const end = src.indexOf('\n    }', at)
+  return src.slice(at, end + '\n    }'.length)
+}
+
+/**
  * Run the shipped mapping against a list of entries.
  *
  * `toReport` is a const arrow, so the slice is evaluated as a declaration and the
  * binding is what gets returned.
  */
 const run = (annotations) => {
+  // `pageGroups` comes along because `inReadingOrder` is a flat view of it: lifting
+  // the flat one alone would fail on an undefined binding instead of testing order.
+  const helpers = `${liftFunction('usable')}\n${liftFunction('pageGroups')}\n${liftFunction('inReadingOrder')}`
   // eslint-disable-next-line no-new-func
-  return new Function('annotations', `${mapper}\n return toReport(annotations)`)(annotations)
+  return new Function('annotations', `${helpers}\n${mapper}\n return toReport(annotations)`)(annotations)
 }
 
 console.log('')
@@ -114,14 +136,51 @@ console.log('=== the list renderer filters before reading ===')
 // render and blanked the sidebar. The guard has to be at the read site.
 check(/function usable\(list\)/.test(src), 'a filter helper exists')
 check(/entry !== null && typeof entry === 'object'/.test(src), 'it keeps only object entries')
-check(/inReadingOrder\(usable\(annotations\)\)/.test(src), 'the list filters before ordering')
+check(/pageGroups\(usable\(annotations\)\)/.test(src), 'the list filters before grouping')
 check(/usable\(annotations\)\.length/.test(src), 'the badge counts what the list shows')
 
 console.log('')
+console.log('=== the report is ordered the way the panel lists ===')
+// The host numbers its `## Element n` headings by POSITION in the reported array,
+// so the array's order IS the numbering. Sending arrival order made the block call
+// an element 2 that the panel and its pin both called 1 — the reader says "element
+// 2" meaning the row in front of them and the model edits the wrong one.
+check(/const toReport = \(list\) => inReadingOrder\(usable\(list\)\)/.test(src),
+  'the report is ordered by the panel\'s own rule')
+{
+  // A reader marks the element lower on the page first, then the one above it. The
+  // panel lists top-to-bottom, so the report must too, whatever order they clicked.
+  const outOfOrder = run([
+    { selector: '.low', text: 'low', doc: { x: 10, y: 900, w: 10, h: 10 } },
+    { selector: '.high', text: 'high', doc: { x: 10, y: 20, w: 10, h: 10 } },
+  ])
+  check(
+    outOfOrder.map((a) => a.selector).join(' | ') === '.high | .low',
+    'a later mark higher on the page is reported first, matching the panel and its pin',
+    outOfOrder.map((a) => a.selector).join(' | '),
+  )
+  // Junk must not shift the numbering of the real entries the way it would if the
+  // ordering ran before the filter.
+  const withJunk = run([
+    null,
+    { selector: '.low', text: 'low', doc: { x: 10, y: 900, w: 10, h: 10 } },
+    'x',
+    { selector: '.high', text: 'high', doc: { x: 10, y: 20, w: 10, h: 10 } },
+  ])
+  check(
+    withJunk.length === 2 && withJunk[0].selector === '.high',
+    'a malformed entry is dropped without renumbering its neighbours',
+    JSON.stringify(withJunk.map((a) => a.selector)),
+  )
+}
+
+console.log('')
 console.log('=== the reading-order sort survives odd entries ===')
-const orderSrc = src.slice(src.indexOf('function inReadingOrder(list)'))
-const orderBody = orderSrc.slice(0, orderSrc.indexOf('\n    }') + 6)
-const order = new Function(`${orderBody}\n return inReadingOrder`)()
+// Both halves, for the same reason as `run` above: `inReadingOrder` delegates to
+// `pageGroups`, and a lifted body that cannot see it throws on the first entry.
+const order = new Function(
+  `${liftFunction('pageGroups')}\n${liftFunction('inReadingOrder')}\n return inReadingOrder`,
+)()
 
 const sortCases = [
   ['empty', []],

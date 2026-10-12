@@ -30,7 +30,22 @@ console.log('=== the client no longer renders a block ===')
 // again, which is the exact regression this file guards.
 check(!/renderPayload/.test(clientSrc), 'no renderPayload in the client')
 check(!/payloadFor/.test(clientSrc), 'no payloadFor in the client')
-check(!/Web page elements/.test(clientSrc), 'the client does not know the block heading')
+// The heading may now appear in the client — the transcript chip reads the
+// delivered block back to show what a message carried. Reading is not the
+// regression; WRITING is. So the assertion is no longer "the client has never
+// heard of the heading" but "the heading appears only inside the reader, and
+// the reader composes nothing".
+const parseStart = clientSrc.indexOf('function parseAnnotationBlock')
+const parseEnd = clientSrc.indexOf('/**', parseStart + 1)
+const parseBody = parseStart === -1 ? '' : clientSrc.slice(parseStart, parseEnd)
+const headingHits = [...clientSrc.matchAll(/Web page elements/g)].length
+check(headingHits === 1 && parseBody.includes('Web page elements'),
+  'the heading appears once, inside the chip\'s reader and nowhere else',
+  `occurrences: ${headingHits}`)
+// A reader splits on the element heading; a writer interpolates one. Only the
+// split may exist here, so a `${` heading in the client is the regression.
+check(parseBody !== '' && !/## Element \$\{/.test(parseBody) && !/^[ \t]*# Web page elements',|\[.# Web page elements/m.test(parseBody),
+  'and the reader composes no heading of its own')
 check(!/界面标注|UI annotations/.test(clientSrc), 'no block header text in the client')
 check(!/🎯/.test(clientSrc), 'no decorative marker in the client')
 check(!/panel\.askLine/.test(clientSrc), 'the appended prompt line is gone')

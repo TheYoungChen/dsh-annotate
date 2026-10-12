@@ -28,6 +28,10 @@ window.__ModuleLoader__.load({
 
     const KIND = 'dsh-annotate'
     const TAB_ID = 'dsh-annotate-tab'
+    // The second business Definition's kind, and the keyed renderer seat it
+    // dispatches to. Both names are the same string on purpose: the chat seat
+    // routes by `node.kind`, so one name keeps the two halves from drifting.
+    const CHIP_KIND = 'dsh-annotate-chip'
     const OVERLAY_CHANNEL = 'dsh-annotate-overlay'
     const PANEL_CHANNEL = 'dsh-annotate-panel'
     const API = '/__dsh-annotate'
@@ -47,8 +51,18 @@ window.__ModuleLoader__.load({
         'panel.empty': 'No annotations yet. Choose Select, then click an element in the preview.',
         'panel.emptyShort': 'No annotations yet — choose Select, then click an element.',
         'panel.listTitle': 'Attached to your next message',
+        'panel.listShort': 'Marked',
         'panel.listUnit': 'element(s) attached',
+        'panel.pageUnknown': 'Page not recorded',
         'panel.close': 'Close',
+        'panel.tabClose': 'Close this page',
+        'panel.tabNew': 'Open another page',
+        'panel.tabDraft': 'New tab',
+        'panel.tabDraftHint': 'Type an address and press Enter',
+        'panel.tabDraftCancel': 'Discard this new tab',
+        'panel.tabLimit': 'Opening another closes the oldest — {n} at a time is the limit',
+        'panel.tabEvicted': 'Closed the oldest page — {n} at a time is the limit',
+        'panel.fromClosed': 'page closed',
         'panel.kindMark': 'mark',
         'panel.kindNote': 'note',
         'panel.edit': 'Edit',
@@ -56,7 +70,17 @@ window.__ModuleLoader__.load({
         'panel.removeAll': 'Clear all',
         'composer.capsuleLabel': 'Annotations',
         'composer.capsuleUnit': 'attached',
-        'composer.capsuleHint': 'Sent as context alongside your next message. Not inserted into the text you type.',
+        'composer.capsuleHint': 'Sent as context alongside your next message. Not inserted into the text you type. Open to list them.',
+        'composer.capsuleExpand': 'Show what this batch carries',
+        'composer.capsuleCollapse': 'Collapse',
+        'composer.capsuleLoading': 'Reading…',
+        'composer.capsuleEmpty': 'This batch has no detail to show yet.',
+        'composer.capsuleFailed': 'Could not read the detail. The annotations themselves are still attached.',
+        'chip.label': 'Annotations',
+        'chip.unit': 'in this message',
+        'chip.hint': 'Page elements attached to this message as context. Open to list them.',
+        'chip.page': 'page',
+        'chip.empty': 'This message carries no annotations.',
         'panel.cleared': 'All annotations cleared.',
         'panel.clearFailed': 'Could not clear the annotations. They are unchanged.',
         'panel.open': 'Open a page',
@@ -98,8 +122,18 @@ window.__ModuleLoader__.load({
         'panel.empty': '暂无标注。点击「选取」，然后在预览中点选一个元素。',
         'panel.emptyShort': '暂无标注 —— 点击「选取」，再点选页面上的一个元素。',
         'panel.listTitle': '已附加到下一条消息',
+        'panel.listShort': '已标注',
         'panel.listUnit': '项已附加',
+        'panel.pageUnknown': '未记录页面',
         'panel.close': '关闭',
+        'panel.tabClose': '关闭这个页面',
+        'panel.tabNew': '再开一个页面',
+        'panel.tabDraft': '新标签页',
+        'panel.tabDraftHint': '输入地址后按回车',
+        'panel.tabDraftCancel': '放弃这个新标签页',
+        'panel.tabLimit': '再开一个会关掉最早的 —— 同时最多 {n} 个',
+        'panel.tabEvicted': '已关掉最早打开的页面 —— 同时最多 {n} 个',
+        'panel.fromClosed': '页面已关闭',
         'panel.kindMark': '标注',
         'panel.kindNote': '批注',
         'panel.edit': '编辑',
@@ -107,7 +141,17 @@ window.__ModuleLoader__.load({
         'panel.removeAll': '全部清除',
         'composer.capsuleLabel': '标注',
         'composer.capsuleUnit': '项已附加',
-        'composer.capsuleHint': '作为上下文随下一条消息发送，不会插入到你输入的文字中。',
+        'composer.capsuleHint': '作为上下文随下一条消息发送，不会插入到你输入的文字中。展开可查看明细。',
+        'composer.capsuleExpand': '展开查看这批标注',
+        'composer.capsuleCollapse': '收起',
+        'composer.capsuleLoading': '正在读取…',
+        'composer.capsuleEmpty': '这批标注还没有明细可显示。',
+        'composer.capsuleFailed': '读取明细失败，标注本身仍在。',
+        'chip.label': '批注',
+        'chip.unit': '条随本条消息发出',
+        'chip.hint': '本条消息附带的页面元素上下文，展开可查看明细。',
+        'chip.page': '页面',
+        'chip.empty': '本条消息没有附带批注。',
         'panel.cleared': '已清除全部标注。',
         'panel.clearFailed': '清除失败，标注保持不变。',
         'panel.open': '打开页面',
@@ -172,7 +216,6 @@ window.__ModuleLoader__.load({
 /* The toolbar is one row that never wraps. It used to wrap, and a wrapped
    toolbar is how a 28px control turns into a 90px block on a narrow sidebar. */
 .dsa-bar{display:flex;gap:4px;align-items:center;flex:0 0 auto;min-width:0}
-.dsa-spacer{flex:1 1 auto;min-width:0}
 .dsa-btn{font:500 12px/1 inherit;padding:0 10px;height:28px;display:inline-flex;align-items:center;gap:5px;border-radius:7px;border:1px solid var(--dsa-hair);background:transparent;color:inherit;cursor:pointer;transition:background .15s cubic-bezier(.22,1,.36,1),border-color .15s cubic-bezier(.22,1,.36,1);white-space:nowrap;flex:0 0 auto}
 .dsa-btn:hover:not(:disabled){background:var(--dsa-hover);border-color:rgba(128,128,128,.5)}
 .dsa-btn:active:not(:disabled){background:rgba(128,128,128,.2)}
@@ -190,14 +233,26 @@ window.__ModuleLoader__.load({
 .dsa-open input{flex:1 1 auto;min-width:0;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;height:28px;box-sizing:border-box;padding:0 9px;border-radius:7px;border:1px solid var(--dsa-hair);background:var(--dsa-chrome);color:inherit;transition:border-color .15s cubic-bezier(.22,1,.36,1)}
 .dsa-open input::placeholder{color:inherit;opacity:.45}
 .dsa-open input:focus{outline:2px solid var(--dsa-accent);outline-offset:-1px;border-color:transparent;background:transparent}
-/* Once a page is open the address bar collapses to the host it is showing: a
-   full-width input for a value the reader is not editing is just noise. */
-.dsa-open-wrap{display:flex;gap:4px;align-items:center;flex:0 0 auto;min-width:0}
+/* The address bar lives IN the toolbar, between the marking controls and the page
+   actions, where it takes the slab of width a toolbar otherwise leaves empty.
+   It used to be a row of its own directly under the tab strip, which made the two
+   read as one unit: the reader asked for the tabs and the address to be separate
+   things, one group plus one bar. It is separate now — a different row entirely.
+   It stays the row's slack-taker (the one exception to the size-capped rows below),
+   because an address that truncates is still readable while an address bar that
+   cannot grow is not. */
+.dsa-open-wrap{display:flex;gap:4px;align-items:center;flex:1 1 auto;min-width:0}
 .dsa-loc{display:inline-flex;align-items:center;gap:5px;height:28px;max-width:100%;min-width:0;padding:0 8px;border-radius:7px;border:1px solid transparent;background:var(--dsa-chrome);color:inherit;cursor:pointer;font:12px/1 inherit;flex:1 1 auto;transition:background .15s cubic-bezier(.22,1,.36,1),border-color .15s cubic-bezier(.22,1,.36,1)}
 .dsa-loc:hover{background:var(--dsa-hover);border-color:var(--dsa-hair)}
 .dsa-loc:focus-visible{outline:2px solid var(--dsa-accent);outline-offset:1px}
-/* Truncated from the left, because the END of a host is the part that varies:
-   :3000 distinguishes two servers, localhost does not. */
+/* Truncated from the left, because the route is at the END of the address and
+   the route is what identifies the page: two views of one app share a host and
+   a path prefix and differ only in their tail. Clipping the right would leave
+   "http://10.0.0.7:81/guicomm/#/..." for every page in the app — the same
+   string the reader complained about, just longer.
+   The rtl direction is what makes the ellipsis land on the left; it reorders the
+   glyphs of mixed-direction text, so the address is wrapped in an LTR isolate
+   below to keep the characters themselves in reading order. */
 .dsa-loc-host{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;opacity:.8}
 /* ------------------------------------------------------------ the menu */
 .dsa-menu-wrap{position:relative;flex:0 0 auto}
@@ -221,6 +276,37 @@ window.__ModuleLoader__.load({
    list rows used to leave the page itself a few pixels tall. */
 .dsa-frame{position:relative;flex:1 1 auto;min-height:120px;border-radius:8px;overflow:hidden;border:1px solid var(--dsa-hair);background:var(--dsa-surface)}
 .dsa-frame iframe{width:100%;height:100%;border:0;display:block}
+/* Every open page stays mounted, and the ones behind are hidden. This rule is load
+   bearing rather than cosmetic: the display:block above outranks the user agent's
+   own [hidden]{display:none}, so without it a hidden page would still be laid out
+   on top of the visible one and the reader would see the wrong document. */
+.dsa-frame iframe[hidden]{display:none}
+/* The tab strip, drawn the way a browser draws one: a baseline the tabs stand on,
+   every tab the same width, and the selected tab visibly joined to the page below.
+   The three things the reader asked for are the three rules here — a real border on
+   every tab, an unmistakable selected state, and equal widths.
+   Equal width is flex:1 1 0 on the tab: a basis of 0 means the free space is
+   split evenly, so the tabs divide the sidebar instead of sizing to their labels. */
+.dsa-tabs{display:flex;align-items:flex-end;gap:3px;flex:0 0 auto;margin:0;padding:0;border-bottom:1px solid var(--dsa-hair)}
+.dsa-tab{position:relative;display:flex;align-items:center;gap:2px;flex:1 1 0;min-width:0;height:25px;box-sizing:border-box;border:1px solid var(--dsa-hair);border-bottom:0;border-radius:8px 8px 0 0;background:transparent;color:inherit;margin-bottom:-1px;transition:background .15s cubic-bezier(.22,1,.36,1),opacity .15s cubic-bezier(.22,1,.36,1)}
+/* Unselected tabs are dimmed as a whole rather than by label colour alone, so the
+   contrast with the selected one survives whatever the shell's palette is. */
+.dsa-tab:not([data-on]){opacity:.72}
+.dsa-tab:not([data-on]):hover{opacity:1;background:var(--dsa-hover)}
+/* The selected tab is the one joined to the page below: it carries the chrome
+   colour, gives up its bottom border to the baseline, and gets an accent bar along
+   its top edge — legible at a glance in both light and dark palettes. */
+.dsa-tab[data-on]{background:var(--dsa-chrome);box-shadow:inset 0 2px 0 0 var(--dsa-accent)}
+.dsa-tab-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;background:none;border:0;color:inherit;font:inherit;font-size:11px;padding:0 2px 0 8px;cursor:pointer}
+.dsa-tab[data-on] .dsa-tab-name{font-weight:600}
+.dsa-tab-x{flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:none;border:0;color:inherit;opacity:.55;padding:3px 5px;margin-right:2px;cursor:pointer;border-radius:5px}
+.dsa-tab-x:hover{opacity:1;background:var(--dsa-hair)}
+/* A tab with no address yet. Dashed, so an empty tab cannot be mistaken for a
+   loaded one whose label happens to be hidden. */
+.dsa-tab-draft{border-style:dashed;cursor:default}
+.dsa-tab-draft .dsa-tab-name{opacity:.7;font-style:italic;cursor:default}
+.dsa-tab-new{flex:0 0 auto;display:flex;align-items:center;justify-content:center;align-self:flex-end;width:25px;height:25px;box-sizing:border-box;background:none;border:1px solid transparent;color:inherit;opacity:.65;padding:0;margin-bottom:-1px;cursor:pointer;border-radius:8px 8px 0 0}
+.dsa-tab-new:hover{opacity:1;background:var(--dsa-hover);border-color:var(--dsa-hair)}
 .dsa-hint{font-size:11px;opacity:.6;margin:0;flex:0 0 auto}
 .dsa-hint[data-center]{text-align:center;padding:10px 4px}
 /* The empty frame keeps the preview's footprint so the panel does not reflow the
@@ -261,7 +347,19 @@ window.__ModuleLoader__.load({
  * viewport means it can no longer be half-covered by an adjacent column. The
  * trade-off is that it no longer tracks the button, which is fine: it is a
  * deliberate, dismissable surface rather than a menu. */
-.dsa-count-body{position:fixed;z-index:2147483000;top:50%;left:50%;transform:translate(-50%,-50%);width:min(360px,calc(100vw - 32px));max-height:min(70vh,520px);overflow:auto;background:var(--dsw-specific-menu,#fff);color:inherit;border:1px solid var(--dsa-hair);border-radius:12px;padding:10px;box-shadow:0 18px 48px rgba(0,0,0,.3),0 3px 10px rgba(0,0,0,.16)}
+.dsa-count-body{position:fixed;z-index:2147483000;top:50%;left:50%;transform:translate(-50%,-50%);width:min(360px,calc(100vw - 32px));max-height:min(70vh,520px);overflow:hidden;display:flex;flex-direction:column;background:var(--dsw-specific-menu,#fff);color:inherit;border:1px solid var(--dsa-hair);border-radius:12px;padding:10px;box-shadow:0 18px 48px rgba(0,0,0,.3),0 3px 10px rgba(0,0,0,.16)}
+/* The list scrolls; the action bar does not.
+   The body used to be one scrolling column, so 全部清除 sat under the last row
+   and a long list pushed it below the fold — present, but only after a scroll
+   the reader had no reason to make, which is why it read as missing. Pinning it
+   costs the list a few pixels of height and makes the destructive action
+   findable at any list length. */
+.dsa-count-main{display:flex;flex-direction:column;gap:8px;min-height:0;flex:1 1 auto}
+.dsa-count-main .dsa-list{overflow:auto;min-height:0;flex:0 1 auto}
+.dsa-count-main .dsa-bar{flex:0 0 auto;border-top:1px solid var(--dsa-hair);padding-top:8px}
+/* Full width, because it is the only control in this bar and a half-width
+   destructive button next to empty space reads as secondary. */
+.dsa-count-main .dsa-bar .dsa-btn{flex:1 1 auto;justify-content:center}
 /* A backdrop, so the surface reads as modal and a click anywhere dismisses it.
    Without it a fixed panel over a live page is ambiguous: the reader cannot tell
    whether a click will go to the panel or to the page behind. */
@@ -281,6 +379,15 @@ window.__ModuleLoader__.load({
 .dsa-sel{font:11px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;opacity:.72;word-break:break-all;margin:0}
 .dsa-note{margin:3px 0 0;white-space:pre-wrap;word-break:break-word}
 .dsa-note[data-empty]{opacity:.5;font-style:italic}
+/* The page heading inside the list. It is the boundary the numbers restart at, so
+   it has to read as a heading rather than as a caption: the previous version was a
+   10px dim line under each row, and the reader's words were "it is there but not
+   obvious enough". Sticky, so a long group keeps saying which page it belongs to
+   while it is being scrolled. */
+.dsa-group{position:sticky;top:0;z-index:1;display:flex;align-items:baseline;gap:6px;padding:5px 8px 4px;margin:2px 0 0;background-color:var(--dsw-specific-menu,#fff);border-bottom:1px solid rgba(128,128,128,.28)}
+.dsa-group:first-child{margin-top:0}
+.dsa-group-page{font:600 11px/1.3 system-ui,sans-serif;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;word-break:break-all}
+.dsa-group-count{font:600 10px/1.3 system-ui,sans-serif;font-variant-numeric:tabular-nums;color:#fff;background:var(--dsa-accent,#f0a05a);border-radius:8px;padding:1px 6px;flex:0 0 auto}
 .dsa-item-actions{display:flex;flex-direction:column;gap:3px}
 .dsa-mini{font:12px/1 inherit;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid transparent;background:transparent;color:inherit;cursor:pointer;opacity:.62;transition:background .12s ease,opacity .12s ease}
 .dsa-mini:hover{background:rgba(128,128,128,.16);opacity:1}
@@ -343,7 +450,25 @@ window.__ModuleLoader__.load({
    every supported browser has. Layering keeps the base doing the covering and
    the accent doing the tinting, so the pill stays readable and stays coloured in
    both themes without my guessing a hex for each. */
-.dsa-capsule{align-self:center;flex:none;display:inline-flex;align-items:center;gap:6px;max-width:min(100%,420px);padding:3px 10px 3px 8px;border-radius:999px;background-image:linear-gradient(var(--dsa-accent-soft),var(--dsa-accent-soft));background-color:var(--dsw-specific-menu,#fff);border:1px solid var(--dsa-accent-line);box-shadow:0 1px 3px rgba(0,0,0,.08);font-size:11px;line-height:1.5;color:inherit;box-sizing:border-box;user-select:none}
+.dsa-capsule-host{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none;width:100%;min-width:0}
+/* The pill centres itself in the strip; once open, the detail hangs under it. The
+   host owns the centring now that there is a second element to place, which is why
+   the alignment is here and not on the pill. */
+.dsa-capsule{align-self:center;flex:none;display:inline-flex;align-items:center;gap:6px;max-width:min(100%,420px);padding:3px 10px 3px 8px;border-radius:999px;background-image:linear-gradient(var(--dsa-accent-soft),var(--dsa-accent-soft));background-color:var(--dsw-specific-menu,#fff);border:1px solid var(--dsa-accent-line);box-shadow:0 1px 3px rgba(0,0,0,.08);font-family:inherit;font-size:11px;line-height:1.5;color:inherit;box-sizing:border-box;cursor:pointer}
+.dsa-capsule:hover{border-color:var(--dsa-accent)}
+.dsa-capsule:focus-visible{outline:2px solid var(--dsa-accent);outline-offset:2px}
+.dsa-capsule-caret{opacity:.6;font-size:9px;line-height:1}
+/* The open detail, on the shell's opaque raised surface rather than a bare list:
+   the strip sits directly above the composer, so anything unpainted there lets the
+   input card show through and the rows stop reading as one panel. */
+.dsa-capsule-host--open .dsa-capsule-list{margin-top:2px}
+/* Deliberately two classes rather than one. The rows themselves are the SHARED
+   dsa-chip-list (the chip under a sent message renders the identical list), and
+   that rule comes later in this sheet — so a single-class override here would lose
+   on source order and silently keep the chip's flat left-border treatment. The
+   extra class states the dependency instead of relying on where the rule sits. */
+.dsa-capsule-host .dsa-capsule-list{width:100%;max-width:min(100%,560px);box-sizing:border-box;margin:0;padding:9px 12px 10px 10px;border:1px solid var(--dsa-accent-line);border-radius:12px;background-color:var(--dsw-specific-menu,#fff);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.dsa-capsule-note{font-size:11px;opacity:.72;padding:0 2px}
 .dsa-capsule-dot{width:6px;height:6px;border-radius:50%;background:var(--dsa-accent);flex:0 0 auto}
 /* The label carries the accent itself, so the pill reads as annotated even when
    the tint is subtle. Kept as a separate rule from the dot: the dot shows the
@@ -351,6 +476,53 @@ window.__ModuleLoader__.load({
 .dsa-capsule-label{color:var(--dsa-accent-ink);white-space:nowrap;font-weight:500}
 .dsa-capsule-count{font-weight:700;font-variant-numeric:tabular-nums;color:var(--dsa-accent-ink)}
 .dsa-capsule-unit{opacity:.72;white-space:nowrap}
+/* The transcript chip: what a sent message carried, shown in the conversation
+   under that message.
+
+   It lands under the bubble's LEFT edge, which is where the reader pointed — and
+   that edge takes measuring rather than a CSS keyword. The chip is a flow row of
+   its own, a sibling of the reader's row, so its left edge is the COLUMN's left
+   edge and NOT the bubble's: the bubble is content-sized and right-aligned inside
+   its row, so its left edge moves with the text while the row's does not.
+   Left-aligning without measuring is what parked the chip at the far side of the
+   transcript, nowhere near the message it describes.
+
+   The bubble's RIGHT edge, however, IS the row's (align-items: flex-end), so its
+   width is the one measurement that yields its left edge, and the component sets
+   that offset inline (see chipIndent). These rules are the default and the
+   fallback: with no measurement the row right-aligns, which reads as "under the
+   bubble" and never as "across the transcript".
+
+   It reuses the capsule's accent vocabulary on purpose: the same mark appears
+   in the composer before sending and here after, and one colour is what ties
+   the two halves of that story together. The surface repeats the capsule's
+   trick — the theme's opaque menu layer with the accent laid over it as a
+   gradient — so it stays readable in both themes without a hand-picked hex. */
+.dsa-chip-row{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+/* The measured placement: the chip sits a fixed distance in from the row's left
+   edge, which IS the column's, so it lands under the bubble's left edge. */
+.dsa-chip-row--indent{align-items:flex-start}
+.dsa-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 8px;border-radius:999px;background-image:linear-gradient(var(--dsa-accent-soft),var(--dsa-accent-soft));background-color:var(--dsw-specific-menu,#fff);border:1px solid var(--dsa-accent-line);box-shadow:0 1px 3px rgba(0,0,0,.08);font-family:inherit;font-size:11px;line-height:1.5;color:inherit;box-sizing:border-box;cursor:pointer;user-select:none}
+.dsa-chip:hover{border-color:var(--dsa-accent)}
+.dsa-chip:focus-visible{outline:2px solid var(--dsa-accent);outline-offset:2px}
+/* Same inversion as the capsule, and for the same reason: the surface darkens,
+   so the ink has to lighten, while the hue stays the reader's choice. */
+.dsa-chip[data-dark="true"]{--dsa-accent-ink:hsl(var(--dsa-h) calc(var(--dsa-s) * .8) 80%)}
+.dsa-chip-dot{width:6px;height:6px;border-radius:50%;background:var(--dsa-accent);flex:0 0 auto}
+.dsa-chip-label{color:var(--dsa-accent-ink);font-weight:500;white-space:nowrap}
+.dsa-chip-count{font-weight:700;font-variant-numeric:tabular-nums;color:var(--dsa-accent-ink)}
+.dsa-chip-caret{opacity:.6;font-size:9px;line-height:1}
+.dsa-chip-list{margin:0;padding:0 0 0 10px;list-style:none;display:flex;flex-direction:column;gap:7px;border-left:2px solid var(--dsa-accent-line);max-width:min(100%,560px)}
+.dsa-chip-item{display:flex;gap:7px;font-size:12px;line-height:1.55;align-items:baseline}
+.dsa-chip-num{flex:0 0 auto;font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--dsa-accent-ink);min-width:14px}
+.dsa-chip-body{min-width:0;display:flex;flex-direction:column;gap:1px}
+/* The selector is the one field the reader may want to copy, so it keeps the
+   code face and the sharper ink; the note is prose and stays at full opacity,
+   while the element's own text is evidence and is clamped to two lines. */
+.dsa-chip-sel{font-family:var(--ds-font-family-code,ui-monospace,Menlo,monospace);font-size:11px;opacity:.9;word-break:break-all}
+.dsa-chip-note{opacity:.85;white-space:pre-wrap;word-break:break-word}
+.dsa-chip-text{opacity:.6;font-size:11px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.dsa-chip-page{font-size:10px;opacity:.55;font-family:var(--ds-font-family-code,ui-monospace,Menlo,monospace);word-break:break-all}
 .dsa-servers{display:flex;flex-direction:column;gap:4px;margin:0;padding:0;list-style:none}
 .dsa-server{display:flex;gap:6px;align-items:center;font-size:12px}
 .dsa-server button{flex:1;min-width:0;text-align:left;font:12px/1.4 inherit;padding:5px 8px;border-radius:6px;border:1px solid rgba(128,128,128,.3);background:transparent;color:inherit;cursor:pointer;display:flex;gap:6px;align-items:center}
@@ -405,6 +577,67 @@ window.__ModuleLoader__.load({
     const panelReset = new Map()
 
     /**
+     * The last clear-epoch each session was seen at.
+     *
+     * Module-level rather than a ref inside the capsule, because the capsule is
+     * remounted whenever the composer is: a fresh ref would take the current
+     * epoch as its baseline and the clear that happened while it was away would
+     * never be announced. The panel would keep a list the host had already let go
+     * of — the same disagreement the reset channel exists to end — and its next
+     * report would upload those marks straight back.
+     */
+    const hostEpoch = new Map()
+
+    /**
+     * One annotation, rendered as one row.
+     *
+     * Shared by the two places a reader can ask "what does this batch actually
+     * carry" — the composer capsule before sending, and the chip under a message
+     * after. They show the same thing because they ARE the same thing: the marks
+     * still held, and the marks that went out with a turn. Two renderers would drift
+     * into disagreeing about a field or its order, and that disagreement would be
+     * invisible until a reader compared the two surfaces.
+     *
+     * The number is the mark's row WITHIN ITS PAGE, which is the number the sidebar
+     * prints and the number the pin on that page wears. It is deliberately not the
+     * row in this batch: with marks on two pages a batch-wide 1..n cannot match
+     * either page, because each page only ever sees its own marks and counts from 1.
+     * Rows are grouped by page for the same reason the panel groups them, so the two
+     * surfaces list the same marks in the same order.
+     *
+     * @param items - already filtered; an entry with no field at all is omitted.
+     * @param extraClass - layout modifier for the container, or '' for the plain one.
+     */
+    function annotationDetail(items, extraClass) {
+      const numbered = []
+      pageGroups(Array.isArray(items) ? items : []).forEach((group) => {
+        group.items.forEach((item, index) => numbered.push({ item, number: index + 1 }))
+      })
+      return React.createElement(
+        'ul',
+        { className: extraClass ? `dsa-chip-list ${extraClass}` : 'dsa-chip-list' },
+        numbered.map(({ item, number }, index) => React.createElement(
+          'li',
+          { className: 'dsa-chip-item', key: `i${index}` },
+          React.createElement('span', { className: 'dsa-chip-num' }, String(number)),
+          React.createElement(
+            'div',
+            { className: 'dsa-chip-body' },
+            // Selector first: it is the field that identifies the element, and the
+            // one a reader is most likely to copy.
+            item.selector && React.createElement('code', { className: 'dsa-chip-sel' }, item.selector),
+            // Then the note, which is the only part the reader wrote and therefore
+            // the part they are actually looking for.
+            item.note && React.createElement('span', { className: 'dsa-chip-note' }, item.note),
+            // The element's own text is evidence, not a request, so it stays quiet.
+            item.text && React.createElement('span', { className: 'dsa-chip-text' }, item.text),
+            item.page && React.createElement('span', { className: 'dsa-chip-page' }, `${t('chip.page')}: ${item.page}`),
+          ),
+        )),
+      )
+    }
+
+    /**
      * The attachment indicator, rendered in the dock ABOVE the composer card.
      *
      * `conversation.input.dock` is the slot the DSH shell documents as "full-width
@@ -430,6 +663,16 @@ window.__ModuleLoader__.load({
       const inputActions = props.inputActions || (props.injected && props.injected.inputActions)
       const draft = useInput ? useInput((state) => state.draft) : undefined
       const [count, setCount] = React.useState(0)
+      // The entries themselves, kept only while the reader has it open.
+      //
+      // The poll below already asks the host what it holds, and the host already
+      // answers with the entries — it was throwing that answer away and keeping the
+      // count. So opening this costs no request at all. They are not cached across
+      // renders: closing drops them, because a stale list under a pill that has
+      // since been re-counted would be the one thing worse than no list.
+      const [items, setItems] = React.useState(null)
+      const [open, setOpen] = React.useState(false)
+      const [failed, setFailed] = React.useState(false)
 
       // The sidebar has no composer access of its own, so it reaches the draft
       // through this handle. Keyed by session because a dock mounts per session.
@@ -454,11 +697,27 @@ window.__ModuleLoader__.load({
       // sidebar is not told; the panel would go on listing marks the host no longer
       // has, and the next re-report would upload them straight back. The epoch is
       // how the panel hears about it.
-      const epoch = React.useRef(null)
+      // Which poll's answer still matters.
+      //
+      // `setInterval` fires on a clock and `fetch` does not answer on one, so two
+      // polls can be in flight at once and the OLDER answer can land last. That is
+      // not a cosmetic race: the poll right after a send asks "how many are still
+      // held", the host says 0 because the turn consumed them, and a straggler from
+      // a second earlier then writes the pre-send count straight back. The reader
+      // sees the capsule stay up after a message that already went out, and the
+      // sidebar and the capsule disagree about a number the host has already
+      // changed. Both were reported.
+      //
+      // So every response is stamped and only the newest one is allowed to write.
+      // Dropping a stale answer is always right: a fresher one is already on its way
+      // on the same 1s clock.
+      const latestPoll = React.useRef(0)
       React.useEffect(() => {
         if (!sessionId) return undefined
         let live = true
         const read = async () => {
+          const ticket = latestPoll.current + 1
+          latestPoll.current = ticket
           try {
             const res = await fetch(`${API}/pending`, {
               method: 'POST',
@@ -467,12 +726,23 @@ window.__ModuleLoader__.load({
             })
             const data = await res.json()
             if (!live || !data || data.ok !== true) return
+            // A newer poll has already reported, so this answer describes a state
+            // the component has moved past. Writing it would be a regression.
+            if (ticket !== latestPoll.current) return
             if (typeof data.count === 'number') {
               setCount((previous) => (previous === data.count ? previous : data.count))
             }
+            // Kept in step with the count from the same answer, so an open list can
+            // never describe a batch other than the one the pill is counting. A
+            // reader cannot tell a stale list from a correct one by looking, which
+            // makes this the field where being wrong is least detectable.
+            if (Array.isArray(data.annotations)) {
+              setItems(data.annotations)
+              setFailed(false)
+            }
             if (typeof data.epoch !== 'number') return
-            const seen = epoch.current
-            epoch.current = data.epoch
+            const seen = hostEpoch.has(sessionId) ? hostEpoch.get(sessionId) : null
+            hostEpoch.set(sessionId, data.epoch)
             // The first reading only establishes a baseline: acting on it would
             // purge the panel every time the dock remounts.
             if (seen !== null && data.epoch !== seen) {
@@ -480,23 +750,47 @@ window.__ModuleLoader__.load({
               if (reset) reset()
             }
           } catch (error) {
+            // Reported rather than swallowed: an open list that silently never
+            // fills reads as "this batch is empty", which is a claim about the
+            // reader's annotations and would be false.
             void error
+            if (live) setFailed(true)
           }
         }
         void read()
         const timer = setInterval(read, 1000)
         return () => {
           live = false
+          // Bumping past every ticket in flight, so an answer that arrives after
+          // unmount cannot write into a dead component's state.
+          latestPoll.current += 1
           clearInterval(timer)
         }
       }, [sessionId])
 
       if (!count) return null
-      return React.createElement(
-        'div',
+      // The same filter the chip uses, so the two surfaces cannot count different
+      // things: a malformed entry is dropped rather than counted and then not shown.
+      const rows = (Array.isArray(items) ? items : []).filter((item) => (
+        item && typeof item === 'object' && Boolean(item.selector || item.note || item.text)
+      ))
+      const caret = React.createElement(
+        'span',
+        { className: 'dsa-capsule-caret', 'aria-hidden': 'true' },
+        open ? '▾' : '▸',
+      )
+      // A real button, not a div with a click handler: the pill is the only control
+      // for its own detail, so it has to be reachable and operable from the keyboard
+      // and it has to report its expanded state.
+      const pill = React.createElement(
+        'button',
         {
+          type: 'button',
           className: 'dsa-capsule',
           title: t('composer.capsuleHint'),
+          'aria-expanded': open ? 'true' : 'false',
+          'aria-label': open ? t('composer.capsuleCollapse') : t('composer.capsuleExpand'),
+          onClick: () => setOpen((value) => !value),
           // The accent's ink has to invert with the theme, and the dock renders in
           // whichever theme the shell is in. Read from the DOM rather than from a
           // media query so it follows the shell's own switch, which is not always
@@ -507,37 +801,435 @@ window.__ModuleLoader__.load({
         React.createElement('span', { className: 'dsa-capsule-label' }, t('composer.capsuleLabel')),
         React.createElement('span', { className: 'dsa-capsule-count' }, String(count)),
         React.createElement('span', { className: 'dsa-capsule-unit' }, t('composer.capsuleUnit')),
+        caret,
       )
+      if (!open) return React.createElement('div', { className: 'dsa-capsule-host' }, pill)
+      // The detail sits under the pill, inside the same dock entry, so it is part of
+      // the strip above the composer rather than floating over the transcript.
+      let detail
+      if (failed) detail = React.createElement('div', { className: 'dsa-capsule-note' }, t('composer.capsuleFailed'))
+      else if (!items) detail = React.createElement('div', { className: 'dsa-capsule-note' }, t('composer.capsuleLoading'))
+      else if (!rows.length) detail = React.createElement('div', { className: 'dsa-capsule-note' }, t('composer.capsuleEmpty'))
+      else detail = annotationDetail(rows, 'dsa-capsule-list')
+      return React.createElement(
+        'div',
+        { className: 'dsa-capsule-host dsa-capsule-host--open' },
+        pill,
+        detail,
+      )
+    }
+
+    // ------------------------------------------------- the transcript chip
+
+    /**
+     * Read the annotation block back out of the message that carried it.
+     *
+     * The chip needs the same facts the reader saw when they marked them, and
+     * the only durable copy is the block the host appended for the model. So it
+     * is parsed back rather than fetched: the transcript already holds it, which
+     * means the chip needs no endpoint, no extra request, and no second source of
+     * truth that could disagree with what the model was actually given.
+     *
+     * Two shapes are read, and both have to be, because a transcript outlives the
+     * writer that produced it: a message sent before the block was grouped still
+     * has the old one sitting in the conversation.
+     *
+     * - One page: `## Element N`, then `key: value` lines. No page is named.
+     * - Several: `## <page>` per group, `### Element N` under it, and the element
+     *   numbers restart per group.
+     *
+     * Every value is single-line by construction: the host clips each one through
+     * `clip()`, which collapses whitespace before writing. So a line-oriented parse
+     * is exact here rather than a simplification, and no continuation handling is
+     * owed.
+     *
+     * `at` is deliberately not read. The host emits it only for a positional
+     * selector that matched more than once, and it is geometry for the model to
+     * disambiguate with — it means nothing next to a selector the reader is
+     * already looking at.
+     * @param content - the delivery message's content blocks.
+     * @returns one entry per usable mark, in the order the host wrote them.
+     */
+    function parseAnnotationBlock(content) {
+      const text = Array.isArray(content)
+        ? content.map((block) => (block && block.type === 'text' && typeof block.text === 'string' ? block.text : '')).join('')
+        : (typeof content === 'string' ? content : '')
+      if (!text.includes('# Web page elements')) return []
+      const items = []
+      // The page a section belongs to. `page:` used to be a field of its own; it is
+      // a heading now, so the field is only still read for blocks written before
+      // that changed.
+      let page = ''
+      let fields = null
+      const flush = () => {
+        if (!fields) return
+        const item = {
+          selector: String(fields.selector || '').trim(),
+          note: String(fields.note || '').trim(),
+          text: String(fields.text || '').trim(),
+          page: String(fields.page || page).trim(),
+        }
+        // The host gives a heading only to an element with a body, so a heading
+        // carrying nothing readable is not one of ours.
+        if (item.selector || item.note || item.text) items.push(item)
+        fields = null
+      }
+      // Only the level-2 and level-3 headings are section starts. The block's own
+      // top-level title is level 1 and is deliberately not matched here.
+      for (const raw of text.split('\n')) {
+        const line = raw.trim()
+        const heading = /^#{2,3}[ \t]+(.+)$/.exec(line)
+        if (heading) {
+          const title = heading[1].trim()
+          flush()
+          if (/^Element \d+$/.test(title)) fields = {}
+          else page = title
+          continue
+        }
+        if (!fields) continue
+        const field = /^([a-z]+):[ \t]?(.*)$/.exec(line)
+        if (field && field[2] !== '') fields[field[1]] = field[2]
+      }
+      flush()
+      return items
+    }
+
+    /**
+     * The element that holds the message this chip hangs under, or null.
+     *
+     * NOT `row.previousElementSibling`, which is the obvious guess and is always
+     * null here. The shell wraps every transcript node in its own seat element
+     * (`ChatNodeSeat` renders a div carrying `data-chat-anchor-key`), and the slot
+     * occupant — this chip — is rendered INSIDE that div. So the chip's row has no
+     * sibling at all, and the message is a sibling of the chip's own SEAT.
+     *
+     * Reaching for the seat rather than counting parents keeps this working if the
+     * shell ever nests the occupant one level deeper: `closest` finds the nearest
+     * ancestor that is a transcript node, whatever the depth.
+     *
+     * The attribute is the shell's own documented hook — `ChatNodeSeat` sets
+     * `data-chat-anchor-key` on the element it wraps each node in — so this does not
+     * depend on a hashed class name. With no such ancestor (a test harness, or a
+     * different shell) it falls back to the row itself, whose sibling is then the
+     * right thing to look at anyway.
+     */
+    function chipSeat(row) {
+      if (!row || typeof row.closest !== 'function') return row || null
+      return row.closest('[data-chat-anchor-key]') || row
+    }
+
+    /**
+     * How far in from its row's left edge the chip has to sit to land under the
+     * bubble's left edge.
+     *
+     * The arithmetic is only this simple because the row spans the whole column:
+     * the reader's row is end-aligned, so the bubble's RIGHT edge is the column's
+     * right edge, and therefore
+     *
+     *     bubbleLeft = columnRight - bubbleWidth = columnLeft + columnWidth - bubbleWidth
+     *
+     * so the indent from the row's left edge is `columnWidth - bubbleWidth` exactly.
+     * That identity is also why the chip row carries no width cap of its own: a cap
+     * would make the row's left edge, rather than the column's, the origin of the
+     * offset, and the number would be silently wrong by however much was trimmed.
+     *
+     * `null` means "keep the stylesheet's right alignment": no measurement
+     * (no layout engine, or a row that is not laid out yet), a message whose bubble
+     * could not be found, or a bubble that already fills the column — in which case
+     * the two alignments are the same thing anyway.
+     *
+     * Pulled out as a pure function on purpose. Every environment that runs the
+     * checks has no layout engine — jsdom reports a zero rect for everything — so an
+     * inline computation could only ever be exercised as `null`. As a function the
+     * arithmetic is asserted directly, which is the part that can actually be wrong.
+     */
+    function chipIndent(rowWidth, bubbleWidth) {
+      if (!(rowWidth > 0) || !(bubbleWidth > 0)) return null
+      if (bubbleWidth >= rowWidth) return null
+      const offset = Math.round(rowWidth - bubbleWidth)
+      // A single pixel is not worth an inline style; it is indistinguishable from
+      // the fallback and would only make the DOM noisier.
+      return offset > 1 ? offset : null
+    }
+
+    /**
+     * The row's props for a measured indent, or none when there is no measurement.
+     *
+     * Two things have to change together, which is why this is not a padding value
+     * alone. While the row's items are aligned to the end, a left padding only
+     * narrows the content box and the chip stays where it was — the padding has to
+     * come WITH the alignment flip to move the chip inward at all. The alignment is
+     * a mode and lives in the stylesheet; only the measured number is inline.
+     */
+    function rowProps(indent) {
+      if (indent === null || indent === undefined) return { className: 'dsa-chip-row' }
+      return {
+        className: 'dsa-chip-row dsa-chip-row--indent',
+        style: { paddingLeft: `${indent}px` },
+      }
+    }
+
+    /**
+     * What one sent message carried, shown under that message in the transcript.
+     *
+     * Placement is the whole design. It hangs off the reader's own bubble rather
+     * than the context row, because that row is collapsed to a summary line and
+     * the reader looking for "which of my messages carried annotations" is
+     * looking at their message, not at a row labelled with a package name.
+     *
+     * It is aligned under the bubble's LEFT edge — where the reader pointed — and
+     * reaches that edge by measuring, not by CSS.
+     *
+     * The chip is a sibling of the reader's row, so its own left edge is the
+     * COLUMN's left edge, while the bubble is content-sized and sits at the end of
+     * its row, so its left edge moves with the length of the text. Aligning left
+     * without measuring is what parked the chip across the transcript, away from
+     * the message it describes; that was reported from a real session.
+     *
+     * The bubble's RIGHT edge, by contrast, IS the row's (`align-items: flex-end`),
+     * so its width is the one measurement that yields its left edge. The chip
+     * carries that offset inline. Until there is a measurement — no layout engine,
+     * or a row not yet laid out — the stylesheet's right alignment stands, which
+     * degrades to "under the bubble" rather than "across the transcript".
+     *
+     * Collapsed by default and opened on a click. The marks are reference
+     * material — usually one glance is all that is wanted, and a permanently
+     * expanded list would push the reader's next message down the page for every
+     * message that ever had a mark on it.
+     */
+    function AnnotationChip(props) {
+      const data = props.node && props.node.data
+      const raw = data && Array.isArray(data.items) ? data.items : []
+      // Filtered once, up front, so the count and the list cannot disagree. A
+      // malformed entry is dropped rather than counted: `×3` above a list of two
+      // is worse than either showing two or showing nothing, because it is the one
+      // outcome the reader cannot detect.
+      const items = raw.filter((item) => (
+        item && typeof item === 'object' && Boolean(item.selector || item.note || item.text)
+      ))
+      const [open, setOpen] = React.useState(false)
+      // Under the bubble's own left edge, which is where the reader pointed.
+      //
+      // The offset is `chipIndent`, kept pure so its arithmetic is testable in an
+      // environment with no layout at all — jsdom reports a zero rect for every
+      // element, so an inline computation could only ever be exercised as `null`
+      // there. The measurement below is the untestable half; it is deliberately
+      // dumb, and depends on the bubble being the widest box that shares the row's
+      // right edge.
+      const [indent, setIndent] = React.useState(null)
+      const rowRef = React.useRef(null)
+      React.useLayoutEffect(() => {
+        const row = rowRef.current
+        if (!row) return undefined
+        const measure = () => {
+          // The SEAT, not the row: the chip renders inside the element the shell
+          // wraps each transcript node in, so the row has no sibling to look at.
+          const seat = chipSeat(row)
+          const previous = seat ? seat.previousElementSibling : null
+          if (!previous) return setIndent(null)
+          const rowBox = row.getBoundingClientRect()
+          if (!(rowBox.width > 0)) return setIndent(null)
+          // The bubble is the widest box in the message above which still ends where
+          // that row does: the reader's row is full width and end-aligned, so the
+          // bubble shares its right edge, while the time/copy/fork row is both
+          // narrower and further left. Matching on that edge rather than on a class
+          // name matters — the shell's class names are hashed and private, so a
+          // name-based lookup would not fail loudly on the next release, it would
+          // quietly mis-place the chip.
+          //
+          // The row the bubble is measured against is the PREVIOUS seat's box, so
+          // both edges come from the same coordinate space and no ancestor's padding
+          // has to be reasoned about.
+          const previousBox = previous.getBoundingClientRect()
+          let widest = 0
+          for (const element of previous.querySelectorAll('*')) {
+            const box = element.getBoundingClientRect()
+            if (!(box.width > 0)) continue
+            if (Math.abs(box.right - previousBox.right) > 1) continue
+            if (box.width > widest) widest = box.width
+          }
+          return setIndent(chipIndent(rowBox.width, widest))
+        }
+        measure()
+        // Reflow moves the bubble's left edge, so the offset is stale until the
+        // window is measured again. A resize is the cheap signal for that; getting
+        // it slightly wrong leaves the chip at the wrong indent, never invisible.
+        window.addEventListener('resize', measure)
+        return () => window.removeEventListener('resize', measure)
+      }, [open, items.length])
+      // Nothing to say costs nothing: an empty flow row is display:none in the
+      // shell's own stylesheet, so it takes no gap and no height.
+      if (!items.length) return null
+      const dark = darkMode() ? 'true' : 'false'
+      const chip = React.createElement(
+        'button',
+        {
+          type: 'button',
+          className: 'dsa-chip',
+          'data-dark': dark,
+          title: t('chip.hint'),
+          'aria-expanded': open ? 'true' : 'false',
+          onClick: () => setOpen((value) => !value),
+        },
+        React.createElement('span', { className: 'dsa-chip-dot' }),
+        React.createElement('span', { className: 'dsa-chip-label' }, t('chip.label')),
+        React.createElement('span', { className: 'dsa-chip-count' }, `×${items.length}`),
+        React.createElement('span', { className: 'dsa-chip-caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'),
+      )
+      if (!open) return React.createElement('div', Object.assign({ ref: rowRef }, rowProps(indent)), chip)
+      // The same rows the composer capsule shows, from the shared renderer: the same
+      // marks are being described before and after sending, so they must not be
+      // described differently.
+      const list = annotationDetail(items, '')
+      return React.createElement('div', Object.assign({ ref: rowRef }, rowProps(indent)), chip, list)
+    }
+
+    /**
+     * Register the chip as a second Conversation Definition.
+     *
+     * The annotations already arrive as their own transcript message, so the
+     * chip is a view of an event that exists — not a new source of data. Matching
+     * that one message and giving it a second view is what the Definition
+     * registry exists for, and it needs no DOM decoration and no host change.
+     *
+     * Two details are load-bearing:
+     *
+     * - Only the host's own delivery message matches. The reader's message shares
+     *   the type but is sourced `user`, and pairing the chip with it would put the
+     *   annotations under a message that may carry none.
+     * - The node is located `unresolved` and anchored half a seq before the
+     *   delivery. An unresolved node is outside every Turn, which is what keeps
+     *   it out of compact mode's process folding: that machinery only ever
+     *   considers turn-located nodes, so a chip can neither be folded into a
+     *   collapsed process block nor silently change whether that block offers its
+     *   disclosure. The half-seq offset is the shell's own idiom for a synthetic
+     *   neighbour (`CHAT_SYNTHETIC_SEQ_OFFSETS`), placing the chip after the
+     *   reader's bubble (seq - 1) and before the context row (seq).
+     * @param uiConversation - the injected conversation service.
+     * @returns the registry's own disposer.
+     */
+    function registerChipDefinition(uiConversation) {
+      return uiConversation.events.register({
+        kind: CHIP_KIND,
+        target: 'chat',
+        match: (event) => (
+          event.type === 'user/message'
+          && event.surfaceOp === 'append'
+          && event.data.source.kind === 'plugin'
+          && event.data.source.plugin === KIND
+        )
+          ? { id: String(event.data.id), role: 'start' }
+          : null,
+        start: (context, match) => ({
+          seq: match.event.seq,
+          items: parseAnnotationBlock(match.event.data.content),
+        }),
+        update: (context) => context.state,
+        buildViewNode: (context) => {
+          const state = context.state
+          if (!state || !state.items.length) return null
+          return {
+            key: context.key,
+            kind: CHIP_KIND,
+            id: context.id,
+            target: 'chat',
+            anchorSeq: state.seq - 0.5,
+            location: { kind: 'unresolved' },
+            visibility: 'visible',
+            data: { seq: state.seq, items: state.items },
+          }
+        },
+      })
     }
 
     // ------------------------------------------------------------ the payload
 
     /**
-     * Reading order down the page, then insertion order as a tiebreaker.
+     * Marks grouped by the page they were taken on, in reading order within each.
      *
-     * Document coordinates rather than viewport ones: the list must not reshuffle
-     * just because the user scrolled the preview. Entries without coordinates
-     * sort first rather than throwing, so an entry the page could not measure
-     * still appears.
+     * The page is the unit the reader thinks in, and it is also the only unit the
+     * numbers can be made to agree on. A selector means nothing without the screen
+     * it was read off, and document coordinates are measured in their own document
+     * — so comparing two pages' `y` compares two different rulers. That is not a
+     * detail. A reader who marks one page and then another watched the second mark
+     * take the LOWER number whenever its element happened to sit higher in its own
+     * page, so the list read backwards against the order the marks were made.
+     * Groups are ordered by when each page was first marked instead, and only
+     * inside a group do `y` and `x` mean anything.
+     *
+     * The second job of this shape is the numbering. Each tab is its own origin and
+     * therefore its own storage, so a page only ever sees its own marks and can only
+     * count from 1. Numbering per page is what lets the pin on the page, the row in
+     * the panel and the batch handed to the model wear the SAME number. A
+     * session-wide number would have to be pushed into every page before it could be
+     * shown there, and until it arrived the page's own count would disagree with it.
+     *
+     * Written self-contained on purpose: the checks lift this function out of the
+     * source on its own, so it must not reach for a helper defined beside it.
+     *
+     * @param list - marks to group.
+     * @returns `[{ page, items }]`, groups and items both in display order.
      */
-    function inReadingOrder(list) {
-      const at = (entry, axis) => {
+    function pageGroups(list) {
+      /**
+       * One mark's position in its own document, along one axis. Document
+       * coordinates rather than viewport ones: the list must not reshuffle just
+       * because the reader scrolled. An unmeasurable value reads as 0, so such an
+       * entry still appears, at the top of its own page, rather than throwing.
+       */
+      const docAxis = (entry, axis) => {
         const doc = entry && entry.doc
         const value = doc && doc[axis]
         return typeof value === 'number' && Number.isFinite(value) ? value : 0
       }
-      return (Array.isArray(list) ? list : [])
-        .map((entry, index) => ({ entry, index }))
-        .sort((a, b) => {
-          const ay = at(a.entry, 'y')
-          const by = at(b.entry, 'y')
-          if (ay !== by) return ay - by
-          const ax = at(a.entry, 'x')
-          const bx = at(b.entry, 'x')
-          if (ax !== bx) return ax - bx
-          return a.index - b.index
-        })
-        .map((one) => one.entry)
+      const groups = new Map()
+      ;(Array.isArray(list) ? list : []).forEach((entry, index) => {
+        const page = entry && typeof entry.page === 'string' ? entry.page.trim() : ''
+        let group = groups.get(page)
+        if (!group) {
+          group = { page, items: [], first: Infinity, at: index }
+          groups.set(page, group)
+        }
+        // When this page was first marked. A mark that does not say keeps the group
+        // it is in from claiming a time it does not have.
+        const made = entry && typeof entry.createdAt === 'number' && Number.isFinite(entry.createdAt)
+          ? entry.createdAt
+          : Infinity
+        if (made < group.first) group.first = made
+        group.items.push({ entry, index })
+      })
+      const ordered = Array.from(groups.values())
+      // The pages keep the order the reader met them in, so a mark made later is
+      // never listed above one made earlier merely because of where it sits.
+      ordered.sort((a, b) => (a.first !== b.first ? a.first - b.first : a.at - b.at))
+      ordered.forEach((group) => {
+        group.items = group.items
+          .sort((a, b) => {
+            const ay = docAxis(a.entry, 'y')
+            const by = docAxis(b.entry, 'y')
+            if (ay !== by) return ay - by
+            const ax = docAxis(a.entry, 'x')
+            const bx = docAxis(b.entry, 'x')
+            if (ax !== bx) return ax - bx
+            // Ties keep the order they were made in, so the list does not reshuffle
+            // between renders when two marks share a position.
+            return a.index - b.index
+          })
+          .map((one) => one.entry)
+      })
+      return ordered
+    }
+
+    /**
+     * Every mark in display order: the pages in the order they were first marked,
+     * and each page's marks read down that page.
+     *
+     * A flat view of `pageGroups`, for the callers that need the sequence rather
+     * than the grouping — chiefly the report handed to the host, which numbers its
+     * `## Element n` headings by position in that array.
+     */
+    function inReadingOrder(list) {
+      return pageGroups(list).reduce((all, group) => all.concat(group.items), [])
     }
 
     // The block handed to the model is rendered by the host half, not here. The
@@ -561,45 +1253,136 @@ window.__ModuleLoader__.load({
       return (Array.isArray(list) ? list : []).filter((entry) => entry !== null && typeof entry === 'object')
     }
 
+    /**
+     * What the panel adopts when the page reports its marks.
+     *
+     * Split out of the message handler because this decision is a whole bug
+     * surface on its own: getting it wrong either wipes the reader's marks or
+     * resurrects the ones they just deleted, and both are invisible to anything
+     * that only reads the markup.
+     *
+     * A page that comes up empty while the host is holding marks has either been
+     * rebuilt on a fresh preview origin or lost its storage. The host's copy is
+     * handed back so the pins return with it, instead of the page's silence
+     * wiping an attachment the reader can still see counted in the composer.
+     * Nothing is invented: these are the marks the reader made, returned to the
+     * side that draws them.
+     *
+     * That reasoning only holds for `ready`, which is the page announcing itself.
+     * `changed` is the page answering an action the reader just took, and the one
+     * action that empties the list is deleting the last mark. Restoring there put
+     * the mark straight back: the reader pressed 删除 on the card, the page
+     * removed it and said so, and this was read as a page that had lost its
+     * storage. Deleting the last annotation therefore looked like a dead button
+     * while deleting any earlier one worked — only the empty list triggered it.
+     * A page that is alive and speaking is authoritative about its own marks;
+     * `ready` remains the one case where its silence needs filling in.
+     *
+     * @param args.type - the page's message type.
+     * @param args.incoming - the marks the page reports.
+     * @param args.held - the panel's mirror of what the host holds.
+     * @returns the list to show (`adopt`) plus the list to hand back to the page.
+     *   `restore` is `null` when there is nothing to hand back, and `adopted` says
+     *   whether `adopt` came from the host rather than from the page — those marks
+     *   carry no page id yet and have to be given one before the panel can list
+     *   them.
+     */
+    function batchFromPage(args) {
+      const incoming = usable(args.incoming)
+      const held = usable(args.held)
+      if (args.type === 'ready' && !incoming.length && held.length) {
+        return { adopt: held, restore: held, adopted: true }
+      }
+      return { adopt: incoming, restore: null, adopted: false }
+    }
+
     function NumberedList(props) {
       const { annotations, onEdit, onRemove, onRemoveAll, busy } = props
-      const ordered = inReadingOrder(usable(annotations))
-      if (!ordered.length) return h('p', { className: 'dsa-empty' }, t('panel.empty'))
-      return h(
-        'div',
-        { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+      const groups = pageGroups(usable(annotations))
+      if (!groups.length) return h('p', { className: 'dsa-empty' }, t('panel.empty'))
+      // Grouped by page, and numbered within the group.
+      //
+      // The reader's report: two pages, each with one mark, and both pins read 1
+      // while this list read 1 and 2. The list was numbering the session while the
+      // pages could only number themselves — each tab is its own origin, so its
+      // storage holds its own marks and any count it makes starts at 1. Making the
+      // list agree meant numbering per page here too.
+      //
+      // The page is worth a heading rather than a dim line under each row, which is
+      // what this used to be: the reader said the page was there but "not obvious
+      // enough", and with the numbers now restarting per page the boundary has to
+      // be visible or the list looks like it renumbered itself by mistake. With one
+      // page the heading would only repeat what the address bar already shows, so
+      // it stays away — and so does the wrapper, leaving that case byte-identical.
+      const showPage = groups.length > 1
+      const pageLabel = (page) => (page ? page : t('panel.pageUnknown'))
+      /**
+       * Open one mark for editing, and put the popup away as it opens.
+       *
+       * The reader's report: pressing ✎ opened the mark's card on the page but
+       * left this dialog sitting on top of it, so the card and the list were
+       * both on screen and the card was the one being written in. The action is
+       * "go to this mark", and the surface that sends you there has no reason to
+       * stay. Closing is done through the enclosing `<details>` — the same route
+       * the close button takes — so there is no second piece of open/closed state
+       * to keep in step with the element's own.
+       */
+      const openForEdit = (id, event) => {
+        const details = event && event.currentTarget && event.currentTarget.closest('details')
+        if (details) details.open = false
+        onEdit(id, 'edit')
+      }
+      /**
+       * One mark, numbered by its place in its own page's group.
+       *
+       * The index is the group's, not the list's: that is the whole point of the
+       * grouping, and it is the number the pin on that page wears.
+       */
+      const row = (entry, index) => h(
+        'li',
+        { key: entry.id, className: 'dsa-item', onMouseEnter: () => onEdit(entry.id, 'hover') },
+        h('span', { className: 'dsa-num', 'data-kind': entry.note ? 'note' : 'mark' }, String(index + 1)),
         h(
-          'ul',
-          { className: 'dsa-list' },
-          ordered.map((entry, index) =>
-            h(
-              'li',
-              { key: entry.id, className: 'dsa-item', onMouseEnter: () => onEdit(entry.id, 'hover') },
-              h('span', { className: 'dsa-num', 'data-kind': entry.note ? 'note' : 'mark' }, String(index + 1)),
-              h(
-                'div',
-                { className: 'dsa-body' },
-                h(
-                  'div',
-                  { className: 'dsa-line' },
-                  h('span', { className: 'dsa-kind', 'data-kind': entry.note ? 'note' : 'mark' }, entry.note ? t('panel.kindNote') : t('panel.kindMark')),
-                  h('span', { className: 'dsa-sel' }, entry.selector || entry.tag || ''),
-                ),
-                h(
-                  'p',
-                  { className: 'dsa-note', 'data-empty': entry.note ? undefined : 'true' },
-                  entry.note ? entry.note : '—',
-                ),
-              ),
-              h(
-                'div',
-                { className: 'dsa-item-actions' },
-                h('button', { type: 'button', className: 'dsa-mini', onClick: () => onEdit(entry.id, 'edit'), title: t('panel.edit') }, '✎'),
-                h('button', { type: 'button', className: 'dsa-mini', onClick: () => onRemove(entry.id), title: t('panel.remove') }, '✕'),
-              ),
-            ),
+          'div',
+          { className: 'dsa-body' },
+          h(
+            'div',
+            { className: 'dsa-line' },
+            h('span', { className: 'dsa-kind', 'data-kind': entry.note ? 'note' : 'mark' }, entry.note ? t('panel.kindNote') : t('panel.kindMark')),
+            h('span', { className: 'dsa-sel' }, entry.selector || entry.tag || ''),
+          ),
+          h(
+            'p',
+            { className: 'dsa-note', 'data-empty': entry.note ? undefined : 'true' },
+            entry.note ? entry.note : '—',
           ),
         ),
+        h(
+          'div',
+          { className: 'dsa-item-actions' },
+          h('button', { type: 'button', className: 'dsa-mini', onClick: (event) => openForEdit(entry.id, event), title: t('panel.edit') }, '✎'),
+          h('button', { type: 'button', className: 'dsa-mini', onClick: () => onRemove(entry.id), title: t('panel.remove') }, '✕'),
+        ),
+      )
+      // One list, with the headings as rows inside it, so the `ul` stays the single
+      // scroller the dialog was built around — a scroll box per group would put the
+      // bulk clear below a nested scroll area and out of reach again.
+      const rows = []
+      groups.forEach((group, groupIndex) => {
+        if (showPage) {
+          rows.push(h(
+            'li',
+            { className: 'dsa-group', key: `g${groupIndex}` },
+            h('span', { className: 'dsa-group-page', title: group.page || undefined }, pageLabel(group.page)),
+            h('span', { className: 'dsa-group-count' }, String(group.items.length)),
+          ))
+        }
+        group.items.forEach((entry, index) => rows.push(row(entry, index)))
+      })
+      return h(
+        'div',
+        { className: 'dsa-count-main' },
+        h('ul', { className: 'dsa-list' }, rows),
         h(
           'div',
           { className: 'dsa-bar' },
@@ -696,17 +1479,39 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The host of an open preview, for the collapsed address bar.
+     * Where the open preview currently is, for the collapsed address bar.
      *
-     * `new URL` throws on the workspace-file form the panel also accepts, so a
-     * failed parse falls back to the raw string rather than blanking the control.
+     * The whole point of the control is that the reader can tell which page they
+     * are looking at, and for a hash-routed app the page is entirely in the part
+     * this used to drop. `http://host/guicomm/#/home` and
+     * `http://host/guicomm/#/guicom/command` are different screens with the same
+     * host and path, so the chip showed the same string for both and could not
+     * answer the only question asked of it.
+     *
+     * The search string is kept for the same reason: a view is often selected by
+     * query rather than by path. `new URL` throws on the workspace-file form the
+     * panel also accepts, so a failed parse falls back to the raw string rather
+     * than blanking the control.
      * @param url - the preview URL.
-     * @returns the host, or the URL unchanged when it is not absolute.
+     * @returns the address worth showing, or the URL unchanged when not absolute.
      */
-    function previewHost(url) {
+    function previewAddress(url, target) {
       try {
         const parsed = new URL(url)
-        return parsed.host + (parsed.pathname === '/' ? '' : parsed.pathname)
+        const path = parsed.pathname === '/' && !parsed.hash && !parsed.search ? '' : parsed.pathname
+        // The preview is served from an ephemeral loopback port, so the origin in
+        // `url` is a number the reader never chose and cannot use. The address
+        // they opened is what locates the page, and the path/search/hash below
+        // are the frame's own — the proxy keeps the app's paths, so the two
+        // halves compose into the address they would see in a browser.
+        let host = parsed.host
+        try {
+          const opened = new URL(String(target || ''))
+          if (opened.protocol === 'http:' || opened.protocol === 'https:') host = opened.host
+        } catch (error) {
+          void error
+        }
+        return host + path + parsed.search + parsed.hash
       } catch (error) {
         void error
         return String(url || '')
@@ -731,7 +1536,11 @@ window.__ModuleLoader__.load({
           // The badge counts what the list actually shows, so a dropped entry
           // cannot leave the header claiming more than the body lists.
           h('span', { className: 'dsa-count-badge' }, String(usable(annotations).length)),
-          h('span', null, t('panel.listTitle')),
+          // The short label on screen, the full sentence in the tooltip. The reader's
+          // report: the long phrasing sat in the toolbar on every message and read as
+          // intrusive. The badge already says how many, so the words only have to say
+          // what they are.
+          h('span', null, t('panel.listShort')),
         ),
         // The scrim is inside the `<details>`, so it is rendered only while the list
         // is open and unmounts with it. Native `<details>` already closes on a click
@@ -953,6 +1762,8 @@ window.__ModuleLoader__.load({
           return h('svg', common, h('path', { d: 'M3 8h9' }), h('path', { d: 'M8.4 4.2 12.2 8l-3.8 3.8' }))
         case 'close':
           return h('svg', common, h('path', { d: 'M4 4l8 8' }), h('path', { d: 'M12 4l-8 8' }))
+        case 'plus':
+          return h('svg', common, h('path', { d: 'M8 3.4v9.2' }), h('path', { d: 'M3.4 8h9.2' }))
         case 'file':
           return h('svg', common, h('path', { d: 'M9 1.9H4.9a1.2 1.2 0 0 0-1.2 1.2v9.8a1.2 1.2 0 0 0 1.2 1.2h6.2a1.2 1.2 0 0 0 1.2-1.2V5.1L9 1.9Z' }), h('path', { d: 'M8.9 2v3.2h3.3' }))
         case 'spinner':
@@ -980,12 +1791,51 @@ window.__ModuleLoader__.load({
      * @returns the open bar.
      */
     function OpenBar(props) {
-      const { onOpen, url, setUrl, preview, menu } = props
-      const [editing, setEditing] = React.useState(!preview)
-      // Before a page is open the address bar IS the panel, so it stays out. Once a
-      // page is open it collapses to a single line showing where you are, and the
-      // reader expands it only to navigate elsewhere.
-      const expanded = editing || !preview
+      const { onOpen, url, setUrl, preview, menu, pageUrl, composing, setComposing, draft, onDraftCancel } = props
+      // `composing` means "the reader asked to type a new address", nothing else.
+      //
+      // It used to be seeded from `preview`, which conflated that with "there is
+      // no page yet". The two are not the same: on a remount the panel reopens the
+      // page it remembered in an effect, so `preview` is null on the FIRST render
+      // and arrives a tick later. Seeding it from `preview` left the bar editing
+      // for the rest of the session, and the address display that shows the current
+      // route — the whole point of the control — never appeared after a tab switch.
+      //
+      // It is the PARENT's state, not this component's, because the tab strip's
+      // "new page" button has to open this bar too, and that button is a sibling.
+      // Keeping it here made the one control that adds a page unable to reach the
+      // one control that names a page: the reader had a tab strip they could not
+      // add to, which is what they reported.
+      //
+      // What this flag does NOT mean any more is "collapsed". The bar is now a
+      // full-width row-level field inside the toolbar — see `.dsa-open-wrap` — so
+      // this only chooses between showing the page's address and taking a new one.
+      // It used to shrink the whole control to a content-width chip, which is what
+      // left the toolbar row with a hole beside it.
+      const expanded = composing || !preview
+
+      /**
+       * Open the bar for editing, seeded with the address that is currently open.
+       *
+       * Without this, clicking the address chip expanded an input bound to `url`,
+       * which is only ever written by TYPING. A page opened any other way — from
+       * discovery, from the page list, or by the remount that reopens the remembered
+       * page after a tab switch — left `url` at `''`, so the control that exists to
+       * show you where you are opened BLANK.
+       *
+       * The seed is `target || url` because that is exactly what `/open` takes back:
+       * the reader's own input for a loopback address, the file's url for a workspace
+       * page. Seeding with the display address instead would put a value in the box
+       * that cannot be submitted as-is (a workspace file has no host to type).
+       */
+      const startEditing = () => {
+        if (preview) setUrl(preview.target || preview.url || '')
+        // Editing THIS page's address, so any blank tab is abandoned: the reader has
+        // changed their mind about opening a new one, and leaving it up would make
+        // Enter ambiguous between "go here" and "add a tab".
+        if (draft) onDraftCancel()
+        setComposing(true)
+      }
       return h(
         'div',
         { className: 'dsa-open-wrap' },
@@ -1001,9 +1851,15 @@ window.__ModuleLoader__.load({
                 onKeyDown: (event) => {
                   if (event.key === 'Enter') {
                     onOpen(url)
-                    setEditing(false)
+                    setComposing(false)
                   }
-                  if (event.key === 'Escape' && preview) setEditing(false)
+                  // Escape means "forget this", and for a draft that is the blank tab
+                  // itself rather than only the text: leaving the tab behind with the
+                  // text gone would read as a page that failed to open.
+                  if (event.key === 'Escape') {
+                    if (draft) onDraftCancel()
+                    else if (preview) setComposing(false)
+                  }
                 },
               }),
               h(
@@ -1015,7 +1871,7 @@ window.__ModuleLoader__.load({
                   disabled: !url,
                   onClick: () => {
                     onOpen(url)
-                    setEditing(false)
+                    setComposing(false)
                   },
                 },
                 h(Icon, { name: 'go' }),
@@ -1025,8 +1881,8 @@ window.__ModuleLoader__.load({
               // second entry point beside "Open" made the reader wonder whether the
               // two did different things. Cancel stays, because it belongs to the
               // address bar being edited rather than to the page.
-              preview
-                ? h('button', { type: 'button', className: 'dsa-btn dsa-icon-btn', title: t('panel.cancel'), 'aria-label': t('panel.cancel'), onClick: () => setEditing(false) }, h(Icon, { name: 'close' }))
+              preview || draft
+                ? h('button', { type: 'button', className: 'dsa-btn dsa-icon-btn', title: t('panel.cancel'), 'aria-label': t('panel.cancel'), onClick: () => (draft ? onDraftCancel() : setComposing(false)) }, h(Icon, { name: 'close' }))
                 : null,
             )
           : h(
@@ -1034,14 +1890,144 @@ window.__ModuleLoader__.load({
               {
                 type: 'button',
                 className: 'dsa-loc',
-                title: preview.url,
-                onClick: () => setEditing(true),
+                // The tooltip carries the same address the label does, unstripped
+                // by the bar's width. The label truncates from the left to keep
+                // the route visible, so hovering is how the reader gets the whole
+                // thing — including the part the narrow sidebar cut off.
+                title: previewAddress(pageUrl || preview.url, preview.target),
+                onClick: startEditing,
               },
               h(Icon, { name: 'globe' }),
-              h('span', { className: 'dsa-loc-host' }, previewHost(preview.url)),
+              // Falls back to the preview's own URL until the page has reported:
+              // the frame has to load before the overlay can say where it is, and
+              // an empty chip in that window would look like a failure.
+              //
+              // `bdi` isolates the address from the bar's right-to-left clipping
+              // direction. Without it the neutral characters in an address — the
+              // `#` and `/` of a hash route — take the container's direction and
+              // the tail renders out of order, so `#/guicom/command` would show
+              // its separators on the wrong side.
+              h('span', { className: 'dsa-loc-host' }, h('bdi', null, previewAddress(pageUrl || preview.url, preview.target))),
               h(Icon, { name: 'edit', size: 12 }),
             ),
         menu,
+      )
+    }
+
+    /**
+     * The strip of open pages, above the address bar.
+     *
+     * Browser-shaped on purpose: several pages open at once, one on screen, each with
+     * its own address.
+     *
+     * It renders whenever a page is open — including when there is only ONE — because
+     * it carries the "new page" button, and that button was the missing entry point:
+     * the first version drew the strip only from two pages up, so with one page open
+     * there was no way to ask for a second and the feature was unreachable.
+     *
+     * @param props - the open pages, the active one, and the five actions.
+     * @returns the strip, or null when no page is open at all.
+     */
+    function TabStrip(props) {
+      const { tabs, activeSid, onSelect, onClose, onNew, limit, draft, onDraftCancel } = props
+      // A draft counts as something to draw. The reader's report: pressing "+" only
+      // emptied the address bar, so there was nothing to see and no way to tell
+      // "typing a new address" from "editing this one". A new page has to appear as a
+      // new TAB, which is the only place the reader is looking for it.
+      if ((!tabs || tabs.length === 0) && !draft) return null
+      // The button stays usable at the limit, and says what will happen. Disabling it
+      // would contradict the address bar, which reaches the SAME open path and there
+      // evicts the oldest page — so the reader would be told "close one first" by one
+      // control while another quietly closed one for them. One rule, stated.
+      const full = tabs.length >= limit
+      return h(
+        'div',
+        { className: 'dsa-tabs', role: 'tablist' },
+        // The tab rows are drawn even for a single page, as a browser does. Hiding the
+        // row you are on would make the strip jump the moment a second page arrives,
+        // and with the "new page" button now living here the strip is present anyway,
+        // so there is no height left to save by suppressing it.
+        tabs.map((tab) => h(
+          'div',
+          {
+            key: tab.sid,
+            className: 'dsa-tab',
+            // While a draft is open the blank tab is the selected one, exactly as a
+            // browser selects the new tab you just opened. The page below stays put —
+            // this panel keeps showing it rather than blanking the frame — so exactly
+            // one tab may carry the selected look, or the reader sees two.
+            'data-on': !draft && tab.sid === activeSid ? 'true' : undefined,
+            role: 'tab',
+            'aria-selected': !draft && tab.sid === activeSid ? 'true' : undefined,
+          },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'dsa-tab-name',
+              // The full address, since the label truncates: two pages of one app can
+              // differ only in a route the narrow strip cuts off.
+              title: previewAddress(tab.pageUrl || tab.url, tab.target),
+              onClick: () => onSelect(tab.sid),
+            },
+            h('bdi', null, previewAddress(tab.pageUrl || tab.url, tab.target)),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'dsa-tab-x',
+              title: t('panel.tabClose'),
+              'aria-label': t('panel.tabClose'),
+              onClick: (event) => {
+                event.stopPropagation()
+                onClose(tab.sid)
+              },
+            },
+            h(Icon, { name: 'close', size: 12 }),
+          ),
+        )),
+        // The blank tab. It is not a page — it has no sid, no iframe and no marks —
+        // so it cannot reuse a real tab's element and is drawn dashed instead. It
+        // exists to be SEEN: it is the answer to "did that open a new page or am I
+        // editing the one I have".
+        draft
+          ? h(
+              'div',
+              {
+                className: 'dsa-tab dsa-tab-draft',
+                'data-on': 'true',
+                role: 'tab',
+                'aria-selected': 'true',
+              },
+              h('span', { className: 'dsa-tab-name', title: t('panel.tabDraftHint') }, t('panel.tabDraft')),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'dsa-tab-x',
+                  title: t('panel.tabDraftCancel'),
+                  'aria-label': t('panel.tabDraftCancel'),
+                  onClick: (event) => {
+                    event.stopPropagation()
+                    onDraftCancel()
+                  },
+                },
+                h(Icon, { name: 'close', size: 12 }),
+              ),
+            )
+          : null,
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'dsa-tab-new',
+            title: (full ? t('panel.tabLimit') : t('panel.tabNew')).replace('{n}', String(limit)),
+            'aria-label': (full ? t('panel.tabLimit') : t('panel.tabNew')).replace('{n}', String(limit)),
+            onClick: onNew,
+          },
+          h(Icon, { name: 'plus', size: 12 }),
+        ),
       )
     }
 
@@ -1129,6 +2115,69 @@ window.__ModuleLoader__.load({
     const ACCENT_KEY = 'dsh-annotate:accent'
 
     /**
+     * The page each session had open, so a remounted panel can reopen it.
+     *
+     * The sidebar unmounts a tab body when the reader switches tabs, and the panel
+     * comes back with empty state — including which page it was showing. The
+     * preview itself survives that (the host keeps it for its idle window), but
+     * without remembering the target the panel could only offer the reader a blank
+     * "open a page" box, and the marks on that page went with it. Remembering one
+     * string brings the frame, the page's own marks and the login session behind
+     * them back together.
+     *
+     * Per session, because two conversations may be looking at two different pages.
+     * @param sessionKey - the session the panel belongs to.
+     * @returns the stored target, or an empty string.
+     */
+    function readOpen(sessionKey) {
+      if (!sessionKey) return { targets: [], active: '' }
+      try {
+        const raw = localStorage.getItem(`dsh-annotate:open:${sessionKey}`)
+        if (!raw) return { targets: [], active: '' }
+        // The value used to be a bare target string. Upgrading in place rather than
+        // versioning the key: a reader who had one page open gets exactly that page
+        // back, and there is no second key to keep in step.
+        //
+        // The leading character is tested by CODE rather than against a brace
+        // literal. `check-structure.mjs` guards these files with a raw brace count, so
+        // an unpaired brace inside a string reads to it as a mangled splice — and that
+        // blunt tripwire is worth more than this expression being prettier.
+        if (raw.charCodeAt(0) !== 0x7b) return { targets: [raw], active: raw }
+        const parsed = JSON.parse(raw)
+        const targets = Array.isArray(parsed && parsed.targets)
+          ? parsed.targets.filter((one) => typeof one === 'string' && one)
+          : []
+        const active = typeof (parsed && parsed.active) === 'string' ? parsed.active : ''
+        return { targets, active: targets.indexOf(active) === -1 ? (targets[0] || '') : active }
+      } catch (error) {
+        void error
+        return { targets: [], active: '' }
+      }
+    }
+
+    /**
+     * Remember the open tabs, so a remount brings the whole set back.
+     *
+     * A LIST now rather than one target: the panel can have several pages open, and
+     * remembering only the active one would silently close the rest every time the
+     * sidebar unmounted — which is every tab switch. `active` is stored so the
+     * reader returns to the page they were looking at, not to the first one.
+     * @param sessionKey - the session the tabs belong to.
+     * @param targets - every open page, in strip order.
+     * @param active - the target that was on screen.
+     */
+    function rememberOpen(sessionKey, targets, active) {
+      if (!sessionKey) return
+      try {
+        const list = (Array.isArray(targets) ? targets : []).filter((one) => typeof one === 'string' && one)
+        if (!list.length) localStorage.removeItem(`dsh-annotate:open:${sessionKey}`)
+        else localStorage.setItem(`dsh-annotate:open:${sessionKey}`, JSON.stringify({ targets: list, active: active || '' }))
+      } catch (error) {
+        void error
+      }
+    }
+
+    /**
      * The accent in force, readable outside React.
      *
      * The overlay config is assembled in helpers that are not re-created on every
@@ -1213,6 +2262,10 @@ window.__ModuleLoader__.load({
       const sidebarRightTabs = ctx.get('sidebarRightTabs')
       const sidebarRight = ctx.get('sidebarRight')
       const sessions = ctx.get('sessions')
+      // `uiConversation` is deliberately NOT sampled here. It is provided by
+      // another row, and rows apply concurrently, so a sample taken now reads
+      // `undefined` for a service that is merely still starting — see the chip
+      // registration at the end of `apply`, which waits for it instead.
 
       console.info(
         '[dsh-annotate] activating; services:',
@@ -1243,22 +2296,186 @@ window.__ModuleLoader__.load({
 
       const AnnotateTab = (props) => {
         const [annotations, setAnnotations] = React.useState([])
-        const [mode, setMode] = React.useState('idle')
         const [servers, setServers] = React.useState([])
         const [pages, setPages] = React.useState([])
         const [detecting, setDetecting] = React.useState(false)
         const [url, setUrl] = React.useState('')
-        const [preview, setPreview] = React.useState(null)
+        /**
+         * Whether the address bar is expanded to take a new address.
+         *
+         * Held here rather than inside the bar because the tab strip's "new page"
+         * button opens it, and that button is a sibling: with the state private to the
+         * bar, `+` could not reach it.
+         */
+        const [composing, setComposing] = React.useState(false)
+        /**
+         * Whether the address being typed is for a page that does not exist yet.
+         *
+         * `composing` alone cannot say this, and that ambiguity is what the reader
+         * reported: it is set both by clicking the address chip to edit the CURRENT
+         * page and by pressing "+", so the two look identical — an open, empty text
+         * field — and the reader could not tell whether Enter would navigate this tab
+         * or add one. This flag is the difference, and it is what draws the blank tab.
+         *
+         * Cleared when the page opens, and when the draft is discarded. Never true
+         * while a preview is being edited in place.
+         */
+        const [draft, setDraft] = React.useState(false)
+        /**
+         * The same flag, readable from a continuation.
+         *
+         * `settleDraft` runs after an `await`, by which time the render that closed
+         * over `draft` is long gone and its value is the one from before the request.
+         * The ref is written on every render so the helper sees what is true now.
+         */
+        const draftRef = React.useRef(false)
+        draftRef.current = draft
+        /**
+         * The open pages, and which one is on screen.
+         *
+         * This was a single `preview`, because the panel allowed one page. The pages
+         * themselves were never the limit — the host has always held a Map of previews
+         * and never closes one to make room for another — so what follows is almost
+         * entirely about giving the panel more than one slot and keeping the marks
+         * attributed to the slot they came from.
+         *
+         * Each entry is a preview record plus the per-page state that used to be
+         * panel-wide: its route, its marking mode, and its reload nonce.
+         */
+        const [tabs, setTabsState] = React.useState([])
+        const [activeSid, setActiveSid] = React.useState('')
         const [toast, setToast] = React.useState('')
         const [busy, setBusy] = React.useState(false)
         const [accent, setAccent] = React.useState(readAccent)
+        // Marking is the PANEL's mode, not each page's.
+        //
+        // It used to live on the per-page record, which made toggling
+        // 选取 an act on whichever page happened to be on screen: the reader turns
+        // marking on, switches tab, and the button is off again while the first page
+        // is still capturing clicks. The reader's own reading of a tab strip is the
+        // right one — the tabs differ in CONTENT, but every one of them is a page to
+        // annotate — so the mode is one fact about the panel and it is broadcast to
+        // every open page, which is also what makes the button's own state honest.
+        const [mode, setModeState] = React.useState('idle')
+        // Read synchronously by the message handler, which must compare a page's
+        // report against the mode in force NOW rather than against a stale render.
+        const modeRef = React.useRef('idle')
         const [unplaced, setUnplaced] = React.useState({ count: 0, total: 0, items: [] })
-        const frameRef = React.useRef(null)
+        // One ref per open page, so a message can be aimed at the page it belongs to
+        // rather than at whatever happens to be on screen.
+        const frameRefs = React.useRef(new Map())
         const nonce = React.useRef(0)
-        // Kept in a ref as well so the preview-URL builder can read the current
-        // accent without being rebuilt (and re-navigating the frame) on every
-        // render that touches unrelated state.
+        const reopened = React.useRef(false)
+
+        /** The page on screen. Everything that used to read `preview` reads this. */
+        const preview = tabs.find((tab) => tab.sid === activeSid) || null
+        const pageUrl = preview ? preview.pageUrl || '' : ''
+
+        /**
+         * The preview record the reopen path compares against.
+         *
+         * A ref rather than the rendered value because an async continuation can
+         * outlive the render that started it, and it has to compare against the page
+         * that is open NOW.
+         */
+        const previewRef = React.useRef(null)
+        previewRef.current = preview
         currentAccent = accent
+
+        /** Replace one page's record, leaving the others alone. */
+        const patchTab = (sid, patch) => setTabs((list) => list.map((tab) => (
+          tab.sid === sid ? Object.assign({}, tab, patch) : tab
+        )))
+        const setPageUrl = (value) => setTabs((list) => list.map((tab) => (
+          tab.sid === activeSid ? Object.assign({}, tab, { pageUrl: value }) : tab
+        )))
+
+        /**
+         * The open pages, written through a ref so the handlers see the truth
+         * immediately.
+         *
+         * `useState` alone is not enough. Opening pages is a sequence of awaits —
+         * `/open`, then the tab list — and `tabs` only changes on the next render, so
+         * two pages opened in the same tick both read the SAME stale list and the
+         * second one's `setTabs([...stale, record])` silently dropped the first. The
+         * reader asked for a second page and got one page.
+         *
+         * `tabsRef.current` is therefore the authority: every mutation writes it
+         * synchronously and then mirrors it into state for rendering. Reading
+         * `tabsRef.current` is always current, from any continuation.
+         */
+        const tabsRef = React.useRef([])
+        const setTabs = (next) => {
+          const list = typeof next === 'function' ? next(tabsRef.current) : next
+          tabsRef.current = list
+          setTabsState(list)
+        }
+        // A render is the only other writer: it publishes the committed state back,
+        // which keeps the two in step if React ever batches a change behind us.
+        tabsRef.current = tabs
+        const activeSidRef = React.useRef('')
+        activeSidRef.current = activeSid
+
+        /**
+         * Which page each mark came from, and the marks of pages since closed.
+         *
+         * Without this the panel cannot tell marks apart when two pages are open.
+         * Several tabs can legitimately sit on the SAME route — the same app opened
+         * twice, or two services both serving `/` — and then `page` alone identifies
+         * nothing: the first page's pins would be drawn on the second, because both
+         * the route and the selector match.
+         *
+         * The host still holds ONE batch per session, because the reader's mental
+         * model is one message carrying everything they pointed at across the pages
+         * they had open. So the per-page lists are kept apart here and flattened into
+         * that one batch.
+         */
+        const tabMarks = React.useRef(new Map())
+        /**
+         * Marks from pages the reader has closed.
+         *
+         * Kept rather than dropped: closing a tab is navigation, not a decision to
+         * discard what was written on that page. They stay in the batch and in the
+         * list, labelled with the page they came from.
+         *
+         * They are NOT claimed as located. A selector can only be resolved by the
+         * document it was taken from, and that document is gone — so the entry keeps
+         * the match count observed while the page was still open and is marked as
+         * coming from a closed page, rather than asserting a position nobody can
+         * check any more. The model is told the truth instead of being handed a
+         * selector that may or may not still resolve.
+         */
+        const closedMarks = React.useRef(new Map())
+
+        /** Flatten every page's marks into the one batch the host holds. */
+        const flattenMarks = () => {
+          const out = []
+          for (const tab of tabsRef.current) {
+            const list = tabMarks.current.get(tab.sid)
+            if (Array.isArray(list)) out.push(...list)
+          }
+          for (const [sid, record] of closedMarks.current) {
+            const list = record && Array.isArray(record.marks) ? record.marks : []
+            out.push(...list.map((entry) => Object.assign({}, entry, {
+              closed: true,
+              fromTab: (record && record.target) || '',
+            })))
+          }
+          return out
+        }
+        // Read by `closeTab` and `openTarget`, both of which are declared before the
+        // list is written back and must not close over a stale one.
+        const flattenMarksRef = React.useRef(flattenMarks)
+        flattenMarksRef.current = flattenMarks
+
+        // `openTarget` is rebuilt on every render, so an effect that depended on it
+        // would re-run on every render. The heartbeat reaches it through this ref,
+        // which keeps the effect keyed on the tab count alone while still calling the
+        // current closure.
+        const openTargetRef = React.useRef(null)
+
+        /** How many pages may be open at once. */
+        const TAB_LIMIT = 4
 
         /**
          * The workspace root comes from the shell's workspace snapshot, matched
@@ -1298,25 +2515,59 @@ window.__ModuleLoader__.load({
         const reported = React.useRef(null)
 
         /**
+         * What the host is known to be holding right now.
+         *
+         * The host is the side that decides what rides along with the next message,
+         * and the composer capsule reads it directly — so the panel has to be able
+         * to agree with it. Kept as a ref rather than compared through state
+         * because it is consulted from an event handler that has no fresh render.
+         *
+         * It exists because a page can legitimately report an empty list while the
+         * host holds marks: the preview is reaped after an idle window and the next
+         * open builds a fresh origin whose storage is empty, but the marks the
+         * reader attached are still attached. Taking that empty report at face value
+         * would clear the attachment the reader can see counted in the capsule.
+         */
+        const hostHeld = React.useRef([])
+
+        /**
          * Reduce received annotations to the fields the host renders.
          *
          * The entries arrive over postMessage from a framed page, so nothing
          * about their shape is guaranteed. A throw here used to unmount the tab
          * and blank the sidebar, so a malformed entry is dropped rather than
          * dereferenced.
+         *
+         * Ordered the way the panel lists them, because the host numbers its
+         * `## Element n` headings by position in this array: sending the list in
+         * arrival order made the block call an element 2 that the panel and its
+         * pin both called 1. The reader says "element 2" and means the row they
+         * are looking at, so all three surfaces have to agree — including across
+         * navigation, which is why the number is a mark's place in the session
+         * list rather than a count of what a given page can draw.
          * @param list - annotations as received.
-         * @returns the fields worth sending, in order.
+         * @returns the fields worth sending, in reading order.
          */
-        const toReport = (list) => (Array.isArray(list) ? list : [])
-          .filter((entry) => entry !== null && typeof entry === 'object')
+        const toReport = (list) => inReadingOrder(usable(list))
           .map((entry) => ({
             selector: typeof entry.selector === 'string' ? entry.selector : '',
             text: typeof entry.text === 'string' ? entry.text : '',
             note: typeof entry.note === 'string' ? entry.note : '',
             at: entry.doc && typeof entry.doc === 'object'
               ? `${entry.doc.x},${entry.doc.y} ${entry.doc.w}×${entry.doc.h}`
-              : '',
+              : (typeof entry.at === 'string' ? entry.at : ''),
             matches: typeof entry.selectorMatches === 'number' ? entry.selectorMatches : 1,
+            // The view the mark was made on. The list spans the whole browsing
+            // session — the reader navigates and keeps marking — so the host needs
+            // this to tell two screens of one app apart when it renders the block.
+            page: typeof entry.page === 'string' ? entry.page : '',
+            // A mark whose page has been closed still rides along to the model, but it
+            // is flagged rather than passed off as located: `matches` is the count seen
+            // while that page was still open, and only the originating document could
+            // resolve the selector again. Saying so is what stops the model reading a
+            // stale count as a fact about the page it is being asked to edit.
+            closed: entry.closed === true ? true : undefined,
+            fromTab: entry.closed === true && typeof entry.fromTab === 'string' ? entry.fromTab : undefined,
           }))
 
         /**
@@ -1368,6 +2619,10 @@ window.__ModuleLoader__.load({
           }
           if (reported.current === signature) return
           reported.current = signature
+          // What the host is about to hold. Kept in step at the moment of the
+          // report rather than guessed at later, because the restore path treats a
+          // non-empty mirror as evidence that these marks are still attached.
+          hostHeld.current = payload
           let cancelled = false
           const timer = setTimeout(() => {
             fetch(`${API}/context`, {
@@ -1384,15 +2639,108 @@ window.__ModuleLoader__.load({
           }
         }, [annotations, sessionKey])
 
+        /**
+         * Ask the host what it is holding, and adopt it when the panel has nothing.
+         *
+         * This is the other half of the mount guard above. That guard stops a fresh
+         * panel from reporting an empty list and wiping the host; on its own it left
+         * the panel showing nothing while the composer capsule went on counting the
+         * marks the host still held — the reader's "侧边栏里的所有标注都已经消失了"
+         * next to a capsule that disagreed. Reporting silently was only half the
+         * story: a remounted panel also has to *listen*.
+         *
+         * A page that reports its own marks is still authoritative — this only fills
+         * the gap while there is no page, or none that remembers.
+         */
+        React.useEffect(() => {
+          if (!sessionKey) return undefined
+          let cancelled = false
+          const adopt = async () => {
+            try {
+              const res = await fetch(`${API}/pending`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ session: sessionKey }),
+              })
+              const data = await res.json()
+              if (cancelled || !data || data.ok !== true) return
+              const held = Array.isArray(data.annotations) ? data.annotations : []
+              hostHeld.current = held
+              if (!held.length) return
+              // Ids are invented here because the entries crossed as a report, not as
+              // page state: the panel lists and removes by id, and the page's own
+              // report replaces these with its real ids the moment it arrives.
+              const adopted = held.map((entry, index) => Object.assign({}, entry, {
+                id: `h${index}-${String(entry.selector || '')}`,
+              }))
+              // Recorded as already reported, and recorded BEFORE the state change is
+              // handed to React: the host is holding exactly this, so re-uploading it
+              // would be a no-op round trip, and the reporting effect must not mistake
+              // the adoption for news from the page.
+              reported.current = JSON.stringify(toReport(adopted))
+              setAnnotations((current) => (usable(current).length ? current : adopted))
+            } catch (error) {
+              void error
+            }
+          }
+          void adopt()
+          return () => {
+            cancelled = true
+          }
+        }, [sessionKey])
+
+
         const flash = (message) => {
           setToast(message)
           window.setTimeout(() => setToast(''), 2600)
         }
 
-        const postToPage = (payload) => {
-          const win = frameRef.current && frameRef.current.contentWindow
+        /**
+         * Send a message to one page, or to the page on screen when none is named.
+         *
+         * Aimed per tab rather than at "the frame": with several open, a message meant
+         * for the page the reader is editing must not land on a different one, and a
+         * message meant for a background page (a keep/purge after a delete) has to
+         * reach it even though it is not the active one.
+         */
+        const postToPage = (payload, sid) => {
+          const target = sid || activeSidRef.current
+          const frame = frameRefs.current.get(target)
+          const win = frame && frame.contentWindow
           if (!win) return
-          win.postMessage(Object.assign({ source: PANEL_CHANNEL }, payload), preview ? preview.origin : '*')
+          const tab = tabsRef.current.find((one) => one.sid === target)
+          win.postMessage(Object.assign({ source: PANEL_CHANNEL }, payload), tab ? tab.origin : '*')
+        }
+
+        /**
+         * Empty EVERY open page, not just the one on screen.
+         *
+         * `postToPage` without a sid aims at the active page, which was right while
+         * there was only ever one. With a tab strip it silently stopped meaning
+         * "clear the marks": the background pages kept theirs, and because the list
+         * is the FLATTENED union of every page's marks, the next report from any
+         * page rebuilt the list out of the pages that had never been emptied. The
+         * reader cleared the annotations, watched the list refill, and the composer
+         * went on counting a batch the turn had already carried. Three call sites
+         * had this shape — release-after-send, the count popup's bulk clear, and
+         * "clear all" — so the sweep lives here rather than being repeated.
+         */
+        const purgeEveryPage = () => {
+          for (const tab of tabsRef.current) postToPage({ type: 'purge' }, tab.sid)
+        }
+
+        /**
+         * Forget what every page was holding.
+         *
+         * Purging the pages is only half of it: this panel's own per-page mirror is
+         * what the list is flattened from, so leaving it populated means the next
+         * `ready` or `changed` from any page re-derives the very marks that were
+         * just released. The two sides have to be emptied together or the mirror
+         * wins by arriving second.
+         */
+        const forgetAllMarks = () => {
+          tabMarks.current.clear()
+          closedMarks.current.clear()
         }
 
         const onDetect = React.useCallback(async () => {
@@ -1428,31 +2776,103 @@ window.__ModuleLoader__.load({
           const onMessage = (event) => {
             const data = event.data
             if (!data || data.source !== OVERLAY_CHANNEL) return
-            if (!preview || event.origin !== preview.origin) return
+            // Which page is speaking. Matched by origin rather than assumed to be the
+            // active one: several pages report on boot, and each one's marks belong to
+            // its own tab. Accepting a message from an origin the panel does not have
+            // open is what would let an unrelated frame inject marks.
+            const tab = tabsRef.current.find((one) => one.origin === event.origin)
+            if (!tab) return
+            const mine = tab.sid === activeSidRef.current
             if (data.type === 'ready' || data.type === 'changed') {
-              setAnnotations(data.annotations || [])
+              // `ready` is the page announcing that it exists and is listening. That
+              // is the first moment it can be told the panel's marking mode, and it
+              // is exactly what a page booting into a marking panel needs: the reader
+              // turned 选取 on, then opened or reloaded a page, and the new document
+              // starts idle. `changed` is not a boot, so it is left alone.
+              if (data.type === 'ready') {
+                postToPage({ type: 'mode', mode: modeRef.current }, tab.sid)
+              }
+              // Which list wins, and whether the page is handed its marks back, is
+              // decided by `batchFromPage` — see its comment for why an empty
+              // `changed` must NOT be treated as a page that lost its storage.
+              const outcome = batchFromPage({
+                type: data.type,
+                incoming: data.annotations,
+                held: hostHeld.current,
+              })
+              if (outcome.restore) {
+                postToPage({ type: 'restore', annotations: outcome.restore }, tab.sid)
+              }
+              // Ids are invented for marks that crossed as a report rather than as
+              // page state: the panel lists and removes by id, and the page's own
+              // report replaces these with its real ids the moment it arrives.
+              const adopted = outcome.adopted
+                ? outcome.adopt.map((entry, index) => Object.assign({}, entry, {
+                  id: `h${index}-${String(entry.selector || '')}`,
+                }))
+                : outcome.adopt
+              // Filed under the page that reported them, so the list can be rebuilt
+              // from every open page rather than only the one on screen. Two pages can
+              // share a route and a selector, so the tab is part of a mark's identity.
+              tabMarks.current.set(tab.sid, adopted)
+              if (mine) setAnnotations(flattenMarksRef.current())
+              // The page reports its own address on boot and after every route
+              // change, which is what keeps the address bar honest while the
+              // reader navigates inside the frame.
+              if (typeof data.url === 'string' && data.url) patchTab(tab.sid, { pageUrl: data.url })
             } else if (data.type === 'mode') {
-              setMode(data.mode || 'idle')
+              // A page can leave marking on its own — Escape is handled inside the
+              // frame — and that is a panel-wide fact now, so it is adopted rather
+              // than filed against the page that reported it.
+              //
+              // Compared before acting, which is what stops a loop: `setPageMode`
+              // broadcasts, every page echoes its new mode back, and without this
+              // guard each echo would broadcast again forever. After the first
+              // adoption the reported mode matches and the echo is inert.
+              const reported = data.mode === 'marking' ? 'marking' : 'idle'
+              if (reported !== modeRef.current) setPageMode(reported)
             } else if (data.type === 'missing') {
               flash(t('panel.missing'))
             } else if (data.type === 'unplaced') {
               // The page could not draw a pin for some of the annotations. Saying so
               // is what turns "the count went up and no number appeared" from a
               // mystery into a fact the reader can act on.
-              setUnplaced({
-                count: Number(data.count) || 0,
-                total: Number(data.total) || 0,
-                items: Array.isArray(data.items) ? data.items : [],
-              })
+              //
+              // Reported only by the page on screen: a background page's unplaced
+              // marks are not what the reader is looking at, and warning about them
+              // would send them hunting for a mark on the wrong document.
+              if (mine) {
+                setUnplaced({
+                  count: Number(data.count) || 0,
+                  total: Number(data.total) || 0,
+                  items: Array.isArray(data.items) ? data.items : [],
+                })
+              }
             }
           }
           window.addEventListener('message', onMessage)
           return () => window.removeEventListener('message', onMessage)
         })
 
-        const openTarget = async (target) => {
+        const openTarget = async (target, options) => {
           if (!target) return
           setBusy(true)
+          // The draft became a page, so the blank tab goes — whether the host built a
+          // new preview or was already holding this one. Done on the way out rather
+          // than at each success site so a failure leaves the draft standing for the
+          // reader to correct the address in.
+          //
+          // Guarded on `draft`, and that guard is load-bearing rather than tidy: this
+          // function is also reached by the reopen effect and by the discovery lists,
+          // where there is no draft and the address bar's state is none of its
+          // business. Clearing `composing` unconditionally meant any open at all
+          // collapsed an address the reader was part-way through editing — and it hid
+          // a real regression, because it wiped the seeded state a check was measuring.
+          const settleDraft = () => {
+            if (!draftRef.current) return
+            setDraft(false)
+            setComposing(false)
+          }
           try {
             const res = await fetch(`${API}/open`, {
               method: 'POST',
@@ -1464,13 +2884,82 @@ window.__ModuleLoader__.load({
               flash(data.code === 'notLocal' ? t('panel.notLocal') : data.error || 'failed')
               return
             }
+            // Past this point the page is real, so the blank tab has served its
+            // purpose and goes. Done here rather than at each success site so a
+            // FAILED open leaves the draft standing with the address still in it,
+            // which is where the reader needs it to fix a typo.
+            settleDraft()
             nonce.current += 1
-            setAnnotations([])
-            // `target` is kept so a reload can re-open the same page. It is the
-            // reader's own input for a loopback address and the file's url for a
-            // workspace page — either way it is what `/open` must be asked for again.
-            setPreview({ origin: data.origin, url: data.url, sid: data.sid, nonce: nonce.current, target })
-            setMode('idle')
+            // The host REUSES a preview for a target that is already open and answers
+            // with the sid it already had. That is the same page, so it must not be
+            // added a second time: a second entry would draw a second iframe on one
+            // preview and split that page's marks between two owners.
+            const known = tabsRef.current.find((tab) => tab.sid === data.sid)
+            if (known) {
+              patchTab(data.sid, { nonce: nonce.current, url: data.url, target })
+              // Bringing an existing page to the front is not the reader discarding
+              // anything, so the list is left exactly as it is. Nothing here clears
+              // marks: a refresh and the remount after a tab switch both land in this
+              // branch, and blanking the list would make the mirror effect report an
+              // empty batch — the host would drop it, advance its epoch, and the dock
+              // would purge the page, destroying the marks this exists to keep.
+              if (data.sid !== activeSidRef.current) setActiveSid(data.sid)
+              // NOT `setMode('idle')`. The mode belongs to the panel now, and a
+              // reloaded page coming back must be told what it is — clearing it here
+              // would turn the reader's 选取 off as a side effect of a refresh.
+              postToPage({ type: 'mode', mode: modeRef.current }, data.sid)
+              return
+            }
+            // A page whose tab was closed and is now reopened takes its marks back.
+            // They were never discarded, and re-opening the same address is the reader
+            // returning to them rather than starting over.
+            const parked = closedMarks.current.get(data.sid)
+            if (parked) {
+              closedMarks.current.delete(data.sid)
+              if (Array.isArray(parked.marks) && parked.marks.length) {
+                tabMarks.current.set(data.sid, parked.marks.map((entry) => Object.assign({}, entry, { closed: false })))
+              }
+            }
+            const record = {
+              origin: data.origin,
+              url: data.url,
+              sid: data.sid,
+              nonce: nonce.current,
+              target,
+              pageUrl: '',
+            }
+            // At the limit the oldest page goes, and the reader is told rather than
+            // left to notice a tab missing. Its marks are parked like any other closed
+            // page, so nothing the reader wrote is lost by opening one more.
+            let next = tabsRef.current
+            if (next.length >= TAB_LIMIT && next.length) {
+              const oldest = next[0]
+              const marks = tabMarks.current.get(oldest.sid)
+              if (Array.isArray(marks) && marks.length) {
+                closedMarks.current.set(oldest.sid, { marks, target: oldest.target || oldest.url })
+              }
+              tabMarks.current.delete(oldest.sid)
+              next = next.slice(1)
+              try {
+                await fetch(`${API}/close`, {
+                  method: 'POST',
+                  headers: { 'content-type': 'application/json' },
+                  body: JSON.stringify({ sid: oldest.sid }),
+                })
+              } catch (error) {
+                void error
+              }
+              flash(t('panel.tabEvicted').replace('{n}', String(TAB_LIMIT)))
+            }
+            setTabs([...next, record])
+            setActiveSid(data.sid)
+            // The mode is asserted when the page says it is ready, not here: the
+            // iframe has only just been recorded, so there is no `contentWindow` to
+            // post to yet and a message sent now would be dropped in silence.
+            // Remembered so a remount — a tab switch, a reload — reopens the whole set
+            // rather than a blank box. Written here rather than in an effect so the
+            // stored targets are the ones that actually opened.
+            rememberOpen(sessionKey, [...next, record].map((tab) => tab.target || tab.url), target)
           } catch (error) {
             flash(String((error && error.message) || error))
           } finally {
@@ -1478,9 +2967,115 @@ window.__ModuleLoader__.load({
           }
         }
 
+        // The current `openTarget`, published for the effects that must call it without
+        // depending on its identity. Assigned here because this is where it is defined.
+        openTargetRef.current = openTarget
+
+        /**
+         * Close one page, keeping every mark that was made on it.
+         *
+         * Not a destructive action, so it is not confirmed: the marks stay in the
+         * batch and in the list. Only the page and its pins go away, which is why
+         * closing a tab needs no "are you sure" — there is nothing to be sure about.
+         *
+         * The marks are labelled as coming from a closed page rather than claimed as
+         * located, because the only document that could resolve their selectors is
+         * the one being closed.
+         */
+        const closeTab = async (sid) => {
+          const tab = tabsRef.current.find((one) => one.sid === sid)
+          if (!tab) return
+          const marks = tabMarks.current.get(sid)
+          if (Array.isArray(marks) && marks.length) {
+            closedMarks.current.set(sid, { marks, target: tab.target || tab.url })
+          }
+          tabMarks.current.delete(sid)
+          const rest = tabsRef.current.filter((one) => one.sid !== sid)
+          setTabs(rest)
+          // The neighbour takes over, so the panel is never left without a page while
+          // tabs remain — and the reader lands next to where they were.
+          const nextActive = activeSidRef.current === sid
+            ? (rest.length ? rest[rest.length - 1] : null)
+            : rest.find((one) => one.sid === activeSidRef.current) || null
+          if (nextActive && nextActive.sid !== activeSidRef.current) setActiveSid(nextActive.sid)
+          if (!nextActive) setActiveSid('')
+          rememberOpen(sessionKey, rest.map((one) => one.target || one.url), nextActive ? (nextActive.target || nextActive.url) : '')
+          // The host's proxy is released too. Its 5-minute idle sweep would get it
+          // eventually, but leaving it holds a port and a socket for a page the reader
+          // has finished with.
+          try {
+            await fetch(`${API}/close`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ sid }),
+            })
+          } catch (error) {
+            void error
+          }
+          setAnnotations(flattenMarksRef.current())
+        }
+
+        /**
+         * Reopen the page this session was last showing.
+         *
+         * The tab body is unmounted whenever the reader switches tabs, and it comes
+         * back with empty state, so without this the panel reopened on a blank box
+         * and the reader had to find their page again — which is exactly the
+         * "完全没有记忆" they reported. The host keeps the preview itself for its
+         * idle window, so asking for the same target normally reuses the existing
+         * one: same origin, same storage, same login, same marks.
+         *
+         * Every remembered page is reopened, not just the active one: the reader left
+         * several tabs open, and bringing back one of them would silently close the
+         * rest on every sidebar tab switch.
+         *
+         * Declared after `openTarget` so the ref it calls is already published. It is
+         * keyed on the session alone: `openTarget` is rebuilt every render, and
+         * depending on it would re-run this effect (harmlessly, behind the `reopened`
+         * guard, but for no reason) on every keystroke.
+         */
+        React.useEffect(() => {
+          if (reopened.current || !sessionKey) return
+          const remembered = readOpen(sessionKey)
+          if (!remembered.targets.length) return
+          reopened.current = true
+          // `keepMarks`, because this reopens pages the reader never left.
+          //
+          // On a remount there is no `tabs` state to compare against — the whole
+          // component was unmounted — so the "same target" test cannot fire here. And
+          // the list may already have been adopted from the host a moment ago, by the
+          // effect above, precisely because the marks outlived the panel. Clearing it
+          // would report an empty list, the host would drop the batch and advance its
+          // epoch, and the dock would purge the page: a tab switch would destroy the
+          // attachment it was supposed to preserve.
+          void (async () => {
+            for (const target of remembered.targets) {
+              await openTargetRef.current(target, { keepMarks: true })
+            }
+            // The page the reader was looking at comes back to the front. Done after
+            // the loop because `openTarget` activates whatever it opens, so the last
+            // one opened would otherwise win for no reason the reader chose.
+            if (remembered.active) {
+              const match = tabsRef.current.find((tab) => (tab.target || tab.url) === remembered.active)
+              if (match) setActiveSid(match.sid)
+            }
+          })()
+        }, [sessionKey])
+
+        /**
+         * Switch marking on or off for the WHOLE panel.
+         *
+         * Written through `modeRef` first so the message handler and the Escape
+         * listener see the new value without waiting for a render, and broadcast to
+         * every open page rather than to the one on screen: a page that is not
+         * looking at the button still has to know whether a click on it means
+         * "annotate this" or "press this control".
+         */
         const setPageMode = (next) => {
-          setMode(next)
-          postToPage({ type: 'mode', mode: next })
+          const value = next === 'marking' ? 'marking' : 'idle'
+          modeRef.current = value
+          setModeState(value)
+          for (const tab of tabsRef.current) postToPage({ type: 'mode', mode: value }, tab.sid)
         }
 
         /**
@@ -1503,19 +3098,41 @@ window.__ModuleLoader__.load({
         }
 
         const onRemove = (id) => {
-          setAnnotations((list) => {
-            const next = list.filter((entry) => entry.id !== id)
-            syncPage(next)
-            return next
-          })
+          // Computed from the rendered list rather than inside a state updater.
+          // React may invoke an updater more than once, and this posts a message
+          // and rewrites the host mirror — side effects belong outside it.
+          const next = annotations.filter((entry) => entry.id !== id)
+          // The page draws the pins, so a mark removed here has to be removed
+          // there too. Without this the panel's list and the page's store simply
+          // disagreed, and the page won: its next `changed` report mirrored the
+          // mark straight back, so a delete looked like it had been undone by
+          // itself.
+          //
+          // The whole remaining list is handed over rather than the one id,
+          // because the two sides label the same mark differently: the panel
+          // lists by the id the page gave it, while an adopted entry carries an
+          // id invented here for a report that crossed without one. Matching on
+          // identity — selector, note, route — is the only comparison both sides
+          // can make, and the page already does exactly that when it merges.
+          const payload = toReport(next)
+          hostHeld.current = payload
+          postToPage({ type: 'keep', annotations: payload })
+          setAnnotations(next)
         }
 
         const onRemoveAll = () => {
           setAnnotations([])
+          // The mirror empties with the list. Purging the page while still
+          // claiming to hold a batch is the exact condition the restore path
+          // reacts to, and it would hand every mark straight back.
+          hostHeld.current = []
+          // Every page and the per-page mirror, for the same reason: the list is
+          // their union, so a page left un-purged refills it on its next report.
+          forgetAllMarks()
           // `purge`, not `key`: `key` only leaves marking mode, so using it here
           // left the page's own list intact and the next marking session mirrored
           // it back — which looked like the reader's earlier marks being replaced.
-          postToPage({ type: 'purge' })
+          purgeEveryPage()
         }
 
         /**
@@ -1530,12 +3147,24 @@ window.__ModuleLoader__.load({
         const releaseFromHost = () => {
           setAnnotations([])
           reported.current = JSON.stringify([])
-          postToPage({ type: 'purge' })
-        }
-
-        /** The page is the source of truth for its own store; mirror bulk edits. */
-        const syncPage = (next) => {
-          void next
+          // The host has let go of the batch, so the mirror of what it holds has
+          // to go with it.
+          //
+          // This line is the whole fix for a mark that would not stay deleted. The
+          // mirror was left holding the batch that had just been released, so the
+          // purge sent to the page below emptied it, the page reported itself
+          // empty, and that empty report met a `hostHeld` that still described the
+          // marks — which is precisely the condition the restore path is written
+          // to react to. It put every released mark back on the page, the page
+          // re-reported them, and the host was handed the same batch again. The
+          // reader deleted a mark and watched it come back, and the composer went
+          // on counting marks the turn had already carried.
+          hostHeld.current = []
+          // EVERY page, and this panel's own per-page mirror with them. Aiming at
+          // the active page alone left the background tabs holding their marks, and
+          // the list is their flattened union — so the batch came straight back.
+          forgetAllMarks()
+          purgeEveryPage()
         }
 
         /**
@@ -1562,9 +3191,13 @@ window.__ModuleLoader__.load({
           try {
             await reportAnnotations([])
             setAnnotations([])
+            hostHeld.current = []
+            // "Clear all" means all of them, on whichever pages they were made —
+            // not only on the page that happens to be on screen.
+            forgetAllMarks()
             // `purge`, not `key`: the page holds the durable record and only this
             // explicit act should empty it.
-            postToPage({ type: 'purge' })
+            purgeEveryPage()
             flash(t('panel.cleared'))
           } catch (error) {
             void error
@@ -1631,8 +3264,64 @@ window.__ModuleLoader__.load({
             await openTarget(target)
             return
           }
-          setPreview((live) => (live ? { ...live, nonce: ++nonce.current } : live))
+          patchTab(current.sid, { nonce: ++nonce.current })
         }
+
+        /**
+         * Keep every open page's preview alive.
+         *
+         * The host closes a preview whose `touched` is stale, and `touched` only
+         * advances when the PREVIEW receives a request. With one page that was enough:
+         * it was always on screen and every reload counted. With several open it is
+         * not — a background tab issues no requests at all, so it would be reaped
+         * mid-session and switching back to it would show "connection refused" for a
+         * page the reader never closed.
+         *
+         * The host is told which sids are on screen rather than the frame being poked,
+         * so this does not push traffic into the framed application. Well inside the
+         * 5-minute idle window, so a missed beat is not fatal.
+         *
+         * Keyed on the tab COUNT, not on `openTarget`: that function is rebuilt on every
+         * render, so depending on it re-ran this effect — and fired a beat — on every
+         * render, which is a request per keystroke in the address bar. The reopen path
+         * is reached through a ref for the same reason.
+         */
+        React.useEffect(() => {
+          if (!tabs.length) return undefined
+          let live = true
+          const beat = async () => {
+            const sids = tabsRef.current.map((tab) => tab.sid)
+            if (!sids.length) return
+            try {
+              const res = await fetch(`${API}/touch`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ sids }),
+              })
+              const data = await res.json()
+              if (!live || !data || data.ok !== true) return
+              // A preview the host no longer has cannot be revived by asking again, and
+              // silently keeping the tab would leave the reader clicking a dead page.
+              const gone = Array.isArray(data.missing) ? data.missing : []
+              if (!gone.length) return
+              for (const sid of gone) {
+                const tab = tabsRef.current.find((one) => one.sid === sid)
+                const target = tab && (tab.target || tab.url)
+                // Only a page that CAN be reopened is reopened. A workspace file has a
+                // url to ask for again; nothing else here does.
+                if (target) await openTargetRef.current(target, { keepMarks: true })
+              }
+            } catch (error) {
+              void error
+            }
+          }
+          void beat()
+          const timer = setInterval(beat, 60_000)
+          return () => {
+            live = false
+            clearInterval(timer)
+          }
+        }, [tabs.length])
 
         const menu = h(PanelMenu, {
           servers,
@@ -1676,7 +3365,31 @@ window.__ModuleLoader__.load({
                   busy,
                 })
               : null,
-            h('span', { className: 'dsa-spacer' }),
+            // The address bar sits HERE, in the toolbar row, between the marking
+            // controls and the page actions — it is the row's slack-taker, so the
+            // toolbar no longer carries a spacer and a hole beside it.
+            //
+            // It used to be a sibling row below the tab strip, which made the two
+            // read as one unit and left this row half empty. The reader asked for
+            // the tabs and the address to be separate things: the tabs are a group,
+            // the address is its own bar. This is that, and it is the arrangement
+            // that costs no extra row, so the frame keeps its height.
+            h(OpenBar, {
+              onOpen: openTarget,
+              onDetect,
+              detecting,
+              url,
+              setUrl,
+              preview,
+              pageUrl,
+              composing,
+              setComposing,
+              draft,
+              onDraftCancel: () => {
+                setDraft(false)
+                setUrl('')
+              },
+            }),
             // Refresh sits beside the overflow menu rather than inside it.
             //
             // It is the one action a reader reaches for repeatedly while a page is
@@ -1699,7 +3412,34 @@ window.__ModuleLoader__.load({
             menu,
           ),
 
-          h(OpenBar, { onOpen: openTarget, onDetect, detecting, url, setUrl, preview }),
+          // The tab strip is a row of its OWN, below the toolbar and above the page.
+          // It is one group and the address bar is not part of it.
+          h(TabStrip, {
+            tabs,
+            activeSid,
+            onSelect: setActiveSid,
+            onClose: (sid) => void closeTab(sid),
+            limit: TAB_LIMIT,
+            // Empty the box and open it. The address that is open now belongs to the
+            // page on screen; typing a new one is asking for a DIFFERENT page, so
+            // seeding it with the current address would invite an accidental reload
+            // of the same one. It is also what makes the difference between "go to
+            // this address again" and "open one more page" visible.
+            onNew: () => {
+              setUrl('')
+              setComposing(true)
+              // And a tab to type it in. Without this the only feedback was an empty
+              // address bar, which is the same thing the reader sees when editing the
+              // page they already have — so they could not tell the two apart.
+              setDraft(true)
+            },
+            draft,
+            onDraftCancel: () => {
+              setDraft(false)
+              setComposing(false)
+              setUrl('')
+            },
+          }),
 
           // Shown only when the page could not place every pin. It sits between the
           // toolbar and the frame because that is where the discrepancy is: the
@@ -1722,19 +3462,32 @@ window.__ModuleLoader__.load({
               )
             : null,
 
-          // Before a page is open there is nothing to preview, so the first-run
-          // guidance takes the frame's place rather than sitting above an empty box.
-          preview
+          // Every open page stays MOUNTED, with the ones behind hidden rather than
+          // unmounted. Unmounting a background page would destroy its document, and
+          // coming back to it would be a reload — losing the reader's scroll position,
+          // any typed-but-unsaved state in the page, and its `sessionStorage`. The
+          // cost is one live document per open tab, which is what the tab limit is for.
+          //
+          // Only the active one is shown; the rest are `display:none`. A hidden iframe
+          // is still a loaded document and keeps its own timers, so it will not be
+          // reaped by the host's idle sweep only because the heartbeat below says so.
+          tabs.length
             ? h(
                 'div',
                 { className: 'dsa-frame' },
-                h('iframe', {
-                  key: preview.nonce,
-                  ref: frameRef,
-                  src: preview.url,
-                  title: 'preview',
+                tabs.map((tab) => h('iframe', {
+                  key: `${tab.sid}:${tab.nonce}`,
+                  ref: (node) => {
+                    if (node) frameRefs.current.set(tab.sid, node)
+                    else frameRefs.current.delete(tab.sid)
+                  },
+                  src: tab.url,
+                  title: tab.target || tab.url,
+                  // Only the visible page is in the accessibility tree and reachable by
+                  // keyboard; a hidden one is marked as such rather than left ambiguous.
+                  hidden: tab.sid !== activeSid,
                   sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals',
-                }),
+                })),
               )
             : h(
                 'div',
@@ -1798,6 +3551,54 @@ window.__ModuleLoader__.load({
       // conversation, not to the composer.
       contribute('conversation.input.dock', 'annotate-capsule', AnnotationCapsule, undefined, { key: 'annotate-capsule', order: 5 })
 
+      // The transcript chip, in two registrations that must stay in step: the
+      // renderer seat decides how a chip looks, and the Definition decides which
+      // events get one.
+      //
+      // The seat is registered even when the service is missing, and the
+      // Definition only with the service. That order is deliberate: a Definition
+      // whose kind has no occupant in the keyed seat is not left blank by the
+      // shell — it renders its own fallback, a JSON dump of the node data, in the
+      // reader's transcript. So the seat goes in first and the Definition second,
+      // and a missing `uiConversation` costs the chip and nothing else.
+      contribute('conversation.chat.node', CHIP_KIND, AnnotationChip, undefined, { key: CHIP_KIND, order: 12 })
+
+      // Wait for `uiConversation` rather than sampling it.
+      //
+      // This is the whole reason the chip was invisible while the tab and the
+      // capsule worked. `uiConversation` is provided by another row, and rows
+      // apply concurrently, so reading `ctx.get('uiConversation')` during this
+      // callback returns `undefined` whenever that row happens to be slower —
+      // not because the service is absent but because it has not started yet.
+      // The old code branched on exactly that sample, skipped the registration,
+      // and emitted one `console.warn` nobody reads. Nothing rendered, and
+      // nothing failed, which is why it looked like a missing feature rather
+      // than a race.
+      //
+      // `ctx.inject` is the framework's own answer: the callback runs once the
+      // service is actually active, however late that is. It costs no boot
+      // safety — a dependency that never arrives at all leaves this entry's fiber
+      // ACTIVE, so the shell's own "did every entry activate" audit still passes
+      // and the plugin degrades to tab-plus-capsule.
+      try {
+        ctx.inject(['uiConversation'], (scope) => {
+          // Wrapped because the registry refuses a kind it already holds, and it
+          // refuses by throwing. A reload that re-runs `apply` on a live registry
+          // would otherwise take the whole sidebar down with it — the failure mode
+          // worth more than the chip.
+          try {
+            scope.effect(() => registerChipDefinition(scope.uiConversation))
+          } catch (error) {
+            console.warn(
+              'dsh-annotate: the transcript chip could not register; annotations still attach as context',
+              error,
+            )
+          }
+        })
+      } catch (error) {
+        console.warn('dsh-annotate: the transcript chip could not be wired to the conversation service', error)
+      }
+
       const onKeyDown = (event) => {
         if (!(event.metaKey || event.ctrlKey) || !event.shiftKey) return
         if (String(event.key).toLowerCase() !== 'b') return
@@ -1814,6 +3615,27 @@ window.__ModuleLoader__.load({
     // Exposed for the offline checks: the reset channel is the seam where the dock
     // and the sidebar agree, and it cannot be exercised through the DOM.
     exports.__panelReset = panelReset
+    // Exposed for the offline checks: the block parser is the seam between what the
+    // host writes and what the chip shows, and it is pure, so it is testable
+    // without a shell. Re-parsing the host's own output is the only way to notice
+    // the two sides drifting apart.
+    exports.__parseAnnotationBlock = parseAnnotationBlock
+    // Exposed for the offline checks: the placement arithmetic is the one part of
+    // the chip that a browser test cannot reach either — jsdom has no layout, so
+    // every measurement there is `null` and the offset would go unexercised. The
+    // function is pure, so asserting it directly is the only way to cover the
+    // number the reader actually sees.
+    exports.__chipIndent = chipIndent
+    exports.__rowProps = rowProps
+    // Exposed because getting it wrong is silent: the row has no sibling at all, so
+    // a wrong anchor yields "unmeasured" and the stylesheet's fallback, which looks
+    // deliberate. Asserted against a real seat wrapper in the DOM check.
+    exports.__chipSeat = chipSeat
+    // Exposed for the offline checks: this decides whether a page's report is
+    // adopted or handed back, and both ways of getting it wrong are silent — the
+    // reader either loses their marks or watches a deleted one return. Pure, so it
+    // is asserted directly rather than inferred from a rerender.
+    exports.__batchFromPage = batchFromPage
     return module.exports
   },
 })

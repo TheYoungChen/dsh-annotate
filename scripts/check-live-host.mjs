@@ -6,8 +6,13 @@
  * was correct in source and absent from the running host for an hour.
  */
 import { createServer } from 'node:http'
+import { readFileSync } from 'node:fs'
 
 const BASE = process.argv[2] || 'http://127.0.0.1:3080'
+// Read from the manifest rather than repeating the number here. A literal goes
+// stale on every release and then fails for the one reason this file is not about:
+// the last two release rounds each had to edit this line by hand.
+const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 
 const page = createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/html' })
@@ -34,7 +39,8 @@ const ok = (pass, label, detail) => {
 console.log(`\n=== what ${BASE} is serving right now ===`)
 const ping = await fetch(`${BASE}/__dsh-annotate/ping`).then((r) => r.json()).catch(() => null)
 ok(ping && ping.ok === true, 'the plugin answers', ping ? JSON.stringify(ping) : 'no response')
-ok(ping && ping.version === '0.2.2', 'and it is the current version', ping && ping.version)
+ok(ping && ping.version === manifest.version, 'and it is the version on disk',
+  `${ping && ping.version} vs package.json ${manifest.version}`)
 
 const opened = await post('/__dsh-annotate/open', { action: 'open', url: target })
 let body = null

@@ -65,11 +65,29 @@ check(!/state\.annotations = \[\]/.test(keyCase),
   keyCase.split('\n').filter((l) => l.includes('state.annotations')).join(' | ') || '(no assignment)')
 check(/setMode\('idle'\)/.test(keyCase), 'it only leaves marking mode')
 const purgeAt = overlay.indexOf("case 'purge':")
-const purgeCase = overlay.slice(purgeAt, purgeAt + 500)
+// Sliced to the NEXT case rather than a fixed 500 characters. The fixed window was
+// only ever a guess at the case's length, and a longer comment pushed the assignment
+// out of it — the assertion then failed on correct code, which is the one way a
+// source-slice check can be worse than useless.
+const purgeCase = overlay.slice(purgeAt, overlay.indexOf("case 'restore':", purgeAt))
 check(/state\.annotations = \[\]/.test(purgeCase),
   'the explicit purge is what empties it')
-check(/postToPage\(\{ type: 'purge' \}\)/.test(src),
-  'and the panel sends purge, not key, when clearing')
+// Emptying the store is invisible on its own: the numbered bubbles are drawn by
+// `renderPins()`, which runs only from `render()`. Without it the reader is told the
+// marks are gone — sidebar and capsule clear — while the bubbles sit on the page
+// until an unrelated event happens to redraw them. Reported from a real session.
+check(/^\s+render\(\)$/m.test(purgeCase),
+  'and it redraws the page, or the numbered bubbles outlive the marks they label')
+// `purge`, not `key`, and aimed at EVERY page rather than at whatever is on screen.
+// The no-sid form only reached the active page, so with two pages open the one in
+// the background kept its marks; the list is their flattened union, so the batch
+// the reader had just let go of came straight back — the composer went on counting
+// it and the sidebar went on listing it.
+check(/const purgeEveryPage = \(\) => \{\n\s+for \(const tab of tabsRef\.current\) postToPage\(\{ type: 'purge' \}, tab\.sid\)/.test(src),
+  'the panel purges every open page, not just the active one')
+check(!/postToPage\(\{ type: 'purge' \}\)/.test(src),
+  'and the sid-less purge that missed the background pages is gone',
+  (src.match(/postToPage\(\{ type: 'purge' \}\)/g) || []).length + ' left')
 
 console.log('')
 console.log('=== an empty batch is reportable, so clearing reaches the host ===')

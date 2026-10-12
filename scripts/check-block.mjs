@@ -112,6 +112,63 @@ check(render('unknown-session') === '', 'an unknown session renders the empty st
 // its shape. Junk becomes an empty contribution rather than a block of empty
 // headings, which would cost tokens and tell the model nothing.
 console.log('')
+console.log('=== a list spanning several routes names each one ===')
+// Marks now live for the whole browsing session, so one report can carry elements
+// taken from several views of an app. `.tbl` means nothing without knowing which
+// screen it was read off, so the route is emitted — but only then. A single-route
+// report is the overwhelmingly common case and must not grow: the heading would
+// only repeat what the reader already knows.
+const SAME_ROUTE = [
+  { selector: '.a', text: 'A', note: 'one', page: '/app/#/home' },
+  { selector: '.b', text: 'B', note: 'two', page: '/app/#/home' },
+]
+pending.set('one-route', SAME_ROUTE)
+const oneRoute = render('one-route')
+// Both halves matter. Testing only for a `page:` line is vacuous once the page
+// became a heading: the mutated writer emits `## /app/#/home` and no `page:` line
+// at all, so the assertion would pass while the block grew a heading it does not
+// need. The shape is what is being pinned: flat `## Element n`, no page heading.
+check(!/page:/.test(oneRoute), 'a single-route list carries no page line', JSON.stringify(oneRoute.slice(0, 50)))
+check(/^## Element 1[ \t]*$/m.test(oneRoute) && !/^#{2,3}[ \t]+\//m.test(oneRoute),
+  'a single-route list stays flat — no page heading, and its elements are its own numbered sections',
+  JSON.stringify(oneRoute))
+
+const TWO_ROUTES = [
+  { selector: '.a', text: 'A', note: 'one', page: '/app/#/home' },
+  { selector: '.b', text: 'B', note: 'two', page: '/app/#/command' },
+]
+pending.set('two-routes', TWO_ROUTES)
+const twoRoutes = render('two-routes')
+check(/^## \/app\/#\/home[ \t]*$/m.test(twoRoutes), 'the first element names its route')
+check(/^## \/app\/#\/command[ \t]*$/m.test(twoRoutes), 'and so does the second')
+// Each page is its own heading with its own elements under it, not one shared
+// header listing both: a shared header makes the reader match them up by hand.
+// The elements nest one level deeper (`### Element n`) because the number is now
+// local to its page, and the level is what says so.
+const homeSection = twoRoutes.slice(
+  twoRoutes.indexOf('## /app/#/home'),
+  twoRoutes.indexOf('## /app/#/command'),
+)
+check(homeSection.includes('/app/#/home') && homeSection.includes('selector: .a')
+  && !homeSection.includes('selector: .b'),
+  'and the route heads the elements taken on it, rather than being listed separately')
+// The number restarts per page, which is the whole reason for the nesting: the pin
+// on each page counts only that page, so a page-local number is the only one both
+// surfaces can agree on.
+check((twoRoutes.match(/### Element 1/g) || []).length === 2
+  && !/Element 2/.test(twoRoutes),
+  'each page numbers its own elements from 1, so both pages say Element 1',
+  JSON.stringify(twoRoutes.match(/^#{2,3} .*/gm)))
+// An entry with no recorded page is still listed, under its own heading rather than
+// silently folded into a real page's group — the record does not say where it came
+// from, so no page may claim it.
+pending.set('partial', [{ selector: '.a', page: '/app/#/x' }, { selector: '.b' }])
+const partial = render('partial')
+check(/^## \(page not recorded\)[ \t]*$/m.test(partial),
+  'an entry with no page is filed under a heading that says so, not dropped')
+check(!/page: \n/.test(partial) && !/page: $/m.test(partial), 'and no bare page: line is left behind')
+
+console.log('')
 console.log('=== malformed entries contribute nothing ===')
 const junkCases = [
   ['non-object entries', [1, 'two', null, undefined, []]],

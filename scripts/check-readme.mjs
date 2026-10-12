@@ -47,7 +47,7 @@ const derived = JSON.parse(
 
     // The commands the development section actually prints, minus the ones that need
     // a running instance or an external harness to mean anything.
-    const NEEDS_HOST = ['check-preview-inline.mjs', 'check-live-host.mjs', 'check-reload.mjs', 'check-preflight-power.mjs']
+    const NEEDS_HOST = ['check-preview-inline.mjs', 'check-live-host.mjs', 'check-live-overlay.mjs', 'check-reload.mjs', 'check-preflight-power.mjs']
     const listed = [...readme.matchAll(/^node (scripts\\/[\\w-]+\\.mjs)/gm)]
       .map((m) => m[1].replace('scripts/', ''))
     const offline = listed.filter((n) => !NEEDS_HOST.includes(n))
@@ -59,10 +59,22 @@ const derived = JSON.parse(
     const unlisted = onDisk.filter((n) => !listed.includes(n) && !NEEDS_HOST.includes(n))
 
     const harness = readFileSync(dir + '/check-preflight-power.mjs', 'utf8')
-    const faults = (harness.match(/mutate: '[a-z0-9-]+'/g) || []).length
+    // Case-insensitive, and the run length is not bounded by convention: a
+    // mutation named with a capital letter matched nothing here and so was
+    // silently left out of the count, which then only showed up as the badge
+    // disagreeing with the harness by one. Counting what is there beats counting
+    // what the names are supposed to look like.
+    const faults = (harness.match(/mutate: '[A-Za-z0-9-]+'/g) || []).length
       + (harness.match(/apply: \\(dir\\)/g) || []).length
 
-    process.stdout.write(JSON.stringify({ offline: unique.length, faults, unlisted }))
+    // Every mutation the harness defines must be exercised by a case, or it is a
+    // fault nobody ever injects while the badge claims to cover it.
+    const defined = [...readFileSync(dir + '/mutate.mjs', 'utf8')
+      .matchAll(/^  '([A-Za-z0-9-]+)':/gm)].map((m) => m[1])
+    const used = [...harness.matchAll(/mutate: '([A-Za-z0-9-]+)'/g)].map((m) => m[1])
+    const unused = defined.filter((name) => !used.includes(name))
+
+    process.stdout.write(JSON.stringify({ offline: unique.length, faults, unlisted, unused, defined: defined.length }))
   `]).toString()
 )
 console.log(`  offline checks listed: ${derived.offline}, injected faults: ${derived.faults}`)
@@ -70,6 +82,11 @@ if (derived.unlisted.length) console.log(`  never listed: ${derived.unlisted.joi
 
 ok(derived.unlisted.length === 0, 'every offline check is listed in the README',
   derived.unlisted.join(', ') || 'all listed')
+
+// The other direction: a mutation defined but never injected. The badge would
+// count it while nothing ever proved the test catches it.
+ok(derived.unused.length === 0, 'every defined mutation is injected by a case',
+  derived.unused.join(', ') || `all ${derived.defined} injected`)
 
 {
   const badge = readme.match(/badge\/tests-(\d+)%20passing/)

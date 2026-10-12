@@ -1,6 +1,6 @@
 {
   "name": "dsh-annotate",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Click any element in a live page preview inside the DSH sidebar, annotate or comment on it, and send it to the AI conversation as structured context — no screenshots, no guessing which element you meant.",
   "type": "module",
   "license": "MIT",
@@ -50,7 +50,8 @@
       "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-ui-sidebar-right"
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-conversation"
       ]
     },
     "compatibility": {

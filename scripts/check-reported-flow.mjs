@@ -166,13 +166,23 @@ console.log('=== step 5: open a different file in the same directory ===')
 const other = await callHandler(handler, { method: 'POST', path: '/__dsh-annotate/open', body: { url: `file:///${pageB}`, root: dir } })
 check(other.status === 200 && other.body && other.body.ok === true,
   'a different file opens', JSON.stringify(other.body).slice(0, 160))
-// Files in one directory share a preview server: the server exists to give the
-// framed document an origin of its own, and the entry path is what selects the
-// file. Reusing it is the intent, so this asserts the URL rather than the id.
+// Two files in one directory are two PAGES, so they get two previews.
+//
+// This assertion used to read the other way — `other.sid === first.sid`, "the
+// directory keeps its one preview server" — which was the shipped behaviour and was
+// the bug: identity was `file://` + the DIRECTORY, so opening a second file in the same
+// folder handed back the first file's preview and the reader could never see the second
+// one. Fixed in 0.2.4 so identity is the file itself; the directory is still the read
+// root, it is just no longer the answer to "which page is this".
+//
+// Kept as a pair so the two halves cannot drift apart again: distinct files must not
+// share, and the same file must still reuse (asserted in step 4 and step 6). Asserting
+// only one of them is what let the old version stay green through the report.
 check(other.body && other.body.url && other.body.url.endsWith('/b.html'),
   'the entry URL names the second file', other.body && other.body.url)
-check(other.body && other.body.sid === first.body.sid,
-  'and the directory keeps its one preview server')
+check(other.body && other.body.sid !== first.body.sid,
+  'and a different file in the same directory gets its OWN preview',
+  `${other.body && other.body.sid} vs ${first.body && first.body.sid}`)
 
 console.log('')
 console.log('=== step 6: back to the first file, with both previews alive ===')

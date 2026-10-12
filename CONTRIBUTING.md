@@ -46,7 +46,7 @@ node scripts/check-overlay.mjs
 node scripts/check-selector-target.mjs
 node scripts/check-anchor-shape.mjs
 
-# 变异检测：注入 36 个故障，每一个都必须被抓到
+# 变异检测：注入 52 个故障，每一个都必须被抓到
 node scripts/check-preflight-power.mjs
 ```
 
@@ -79,7 +79,7 @@ node scripts/check-preflight-power.mjs
 
 - [ ] `node --check` 三个源文件都过
 - [ ] 离线检查全绿
-- [ ] `check-preflight-power.mjs` 36/36
+- [ ] `check-preflight-power.mjs` 52/52
 - [ ] 改了导出/行为的话，README 和 CHANGELOG 一起更新
 - [ ] 版本号按 `0.x.Y`：**功能改动进 Y 之外的位**，小修补进 Y
 

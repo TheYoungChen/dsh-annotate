@@ -48,8 +48,15 @@ const keyCase = overlay.slice(overlay.indexOf("case 'key':"), overlay.indexOf("c
 check(!/state\.annotations = \[\]/.test(keyCase),
   'leaving marking mode does not empty the page list')
 const purgeAt = overlay.indexOf("case 'purge':")
-check(/state\.annotations = \[\]/.test(overlay.slice(purgeAt, purgeAt + 500)),
+// To the next case, not to a fixed offset: a fixed window silently stops covering the
+// line it is meant to look at as soon as the block grows a comment.
+const purgeCase = overlay.slice(purgeAt, overlay.indexOf("case 'restore':", purgeAt))
+check(/state\.annotations = \[\]/.test(purgeCase),
   'only the explicit purge does')
+// The clear has to reach the screen as well as the store, or the page keeps drawing
+// bubbles for marks the panel has already dropped.
+check(/^\s+render\(\)$/m.test(purgeCase),
+  'and the purge redraws the page instead of only emptying its store')
 
 console.log('')
 console.log('=== simulate: marking, then marking again ===')

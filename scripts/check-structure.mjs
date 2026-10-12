@@ -74,6 +74,14 @@ const check = (file, required, opts = {}) => {
 
   // Braces must balance. This is the check that would have caught the bad splice
   // immediately, since it dropped a brace pair and kept another.
+  //
+  // Counted RAW, which is crude on purpose: it is a tripwire for a mangled splice,
+  // not a parser. It therefore assumes no string in these files contains an unpaired
+  // brace — a legitimate `!== '{'` would read as an imbalance. An attempt to make it
+  // string-aware with a hand-rolled scanner was worse in both directions: it still
+  // could not model regex literals, and it reported false failures on two files that
+  // `node --check` accepts. A crude check that is right about these files beats a
+  // clever one that is wrong about them.
   const open = (src.match(/\{/g) || []).length
   const close = (src.match(/\}/g) || []).length
   ok(open === close, 'braces balance', `${open} open vs ${close} close`)

@@ -48,6 +48,19 @@ global.IS_REACT_ACT_ENVIRONMENT = true
 // without a preview — which is what made the message path unreachable before.
 const PAGE_ORIGIN = 'http://localhost:9999'
 
+/**
+ * What the host is holding when the panel remounts.
+ *
+ * The sidebar unmounts a tab body while another tab is active, so switching tabs
+ * and coming back re-creates the panel with no state. The composer capsule is a
+ * different surface and is never unmounted, so it goes on counting — which is the
+ * reader's "侧边栏里的所有标注都已经消失了" next to a capsule that disagreed.
+ */
+const HELD = [
+  { selector: '.g-recharge', text: 'Recharge', note: 'held by the host', matches: 1, page: '/index.html' },
+  { selector: '.g-usage', text: 'Usage', note: 'also held', matches: 1, page: '/index.html' },
+]
+
 // Record what fetch receives, so the report to the host can be inspected.
 const posted = []
 global.fetch = async (url, options) => {
@@ -65,6 +78,13 @@ global.fetch = async (url, options) => {
   }
   if (String(url).endsWith('/context')) {
     return { json: async () => ({ ok: true, count: 1 }) }
+  }
+  if (String(url).endsWith('/pending')) {
+    // What the host answers when the reader switches tabs and comes back. The
+    // sidebar's tab body is unmounted while another tab is active, so the panel
+    // remounts with no state at all — and this is the only way it can learn that
+    // the marks the composer capsule is still counting are in fact still attached.
+    return { json: async () => ({ ok: true, count: HELD.length, annotations: HELD }) }
   }
   return { json: async () => ({ ok: true, servers: [], pages: [] }) }
 }
@@ -248,6 +268,133 @@ check(contextPosts.length === 0 || contextPosts.every((p) => p.body && typeof p.
 check(host2.textContent.length > 0, 'the panel is still rendering content',
   `${host2.textContent.length} chars`)
 check(host2.querySelector('.dsa-open'), 'and its address bar is still present')
+
+console.log('')
+console.log('=== a remounted panel adopts what the host still holds ===')
+// The reader's third report: after switching tabs the sidebar listed nothing while
+// the composer capsule went on counting. Staying quiet on mount (asserted above)
+// stopped the panel from WIPING the host, but on its own it left the panel showing
+// an empty list next to a capsule that disagreed. A remounted panel has no state
+// and nothing to compare against, so it also has to ask.
+const adopted = document.createElement('div')
+document.body.appendChild(adopted)
+const adoptedRoot = createRoot(adopted)
+await act(async () => {
+  adoptedRoot.render(React.createElement(AnnotateTab, { sessionId: 's1' }))
+})
+await act(async () => { await new Promise((done) => setTimeout(done, 260)) })
+
+check(posted.some((p) => p.url && p.url.includes('/pending')),
+  'the panel asks the host what it is holding')
+const listed = [...adopted.querySelectorAll('.dsa-item')]
+check(listed.length === HELD.length,
+  'and lists the marks the host still holds, instead of rendering empty',
+  `${listed.length} row(s) for ${HELD.length} held`)
+check(adopted.textContent.includes('held by the host'),
+  'with their notes, so the reader recognises them',
+  JSON.stringify(adopted.textContent.slice(0, 80)))
+// Idempotence: adoption must not bounce back as a fresh report. Re-uploading a
+// batch the host is already holding used to destroy it — the host recorded the
+// report as its own clear-marker — so this is the join between the two fixes.
+const adoptedContext = posted.filter((p) => p.url && p.url.includes('/context'))
+check(adoptedContext.length === 0,
+  'and does not bounce the adopted list back as a new report',
+  `${adoptedContext.length} report(s): ${JSON.stringify(adoptedContext.map((p) => p.body))}`)
+
+console.log('')
+console.log('=== a tab switch reopens the page without discarding the attachment ===')
+// The sidebar unmounts a tab body while another tab is active, so coming back is a
+// fresh mount with no state — including no memory of which page was open. The panel
+// remembers the target and reopens it. The trap: the mirror effect reads a drop from
+// N marks to none as the reader clearing them and reports it, so a reopen that blanks
+// the list would drop the host's batch, advance its epoch, and make the dock purge the
+// page. A tab switch would destroy the very attachment it exists to preserve.
+const REOPEN_KEY = 'dsh-annotate:open:s-reopen'
+global.localStorage.setItem(REOPEN_KEY, `${PAGE_ORIGIN}/dashboard`)
+const beforeMount = posted.length
+const switched = document.createElement('div')
+document.body.appendChild(switched)
+const switchedRoot = createRoot(switched)
+await act(async () => {
+  switchedRoot.render(React.createElement(AnnotateTab, { sessionId: 's-reopen' }))
+})
+await act(async () => { await new Promise((done) => setTimeout(done, 300)) })
+
+const since = posted.slice(beforeMount)
+check(since.some((p) => p.url && p.url.includes('/open')),
+  'the remounted panel reopens the page it remembered')
+const cleared = since.filter(
+  (p) => p.url && p.url.includes('/context') && Array.isArray(p.body && p.body.annotations) && p.body.annotations.length === 0,
+)
+check(cleared.length === 0,
+  'and never reports an empty list, which the host would read as a clear',
+  `${cleared.length} empty report(s) — each one drops the batch and purges the page`)
+check(switched.textContent.length > 0, 'the panel is rendering after the remount')
+
+console.log('')
+console.log('=== the address chip follows the page as it navigates ===')
+// The reader asked for the suffix so they could tell where they were. Showing it
+// once when the page opens is not enough: a single-page app changes its route
+// without ever reloading the frame, so a chip that only reads the address at open
+// shows one unchanging string for every view — which is the original complaint,
+// just reported less often. The chip is driven by what the page announces, so the
+// announcement has to actually reach the rendered control.
+const listenersAfterRemount = listeners.length
+const chipText = () => {
+  const el = switched.querySelector('.dsa-loc-host')
+  return el ? el.textContent : ''
+}
+check(listenersAfterRemount > 0, 'the remounted panel subscribed to page messages',
+  String(listenersAfterRemount))
+const chipAtOpen = chipText()
+for (const fn of listeners) {
+  fn({
+    data: {
+      source: 'dsh-annotate-overlay',
+      type: 'ready',
+      annotations: HELD,
+      url: `${PAGE_ORIGIN}/guicomm/#/guicom/command`,
+    },
+    origin: PAGE_ORIGIN,
+  })
+}
+await act(async () => { await new Promise((done) => setTimeout(done, 80)) })
+const chipAfterNav = chipText()
+check(chipAfterNav.includes('/guicomm/#/guicom/command'),
+  'the chip shows the route the page reported',
+  `${JSON.stringify(chipAtOpen)} -> ${JSON.stringify(chipAfterNav)}`)
+check(chipAfterNav !== chipAtOpen,
+  'and it changed, rather than repeating the address the page opened with')
+check(!chipAfterNav.includes(':9999/#/guicom/command') || chipAfterNav.startsWith('localhost:9999'),
+  'with the host the reader opened, not a rewritten one', chipAfterNav)
+
+console.log('')
+console.log('=== clicking the address chip opens it seeded with the current address ===')
+// Reported: with a page already open, clicking the address bar expanded an EMPTY
+// input instead of entering edit mode on the current address.
+//
+// The input is bound to `url`, which is only ever written by typing. A page opened
+// any other way — discovery, the page list, or the remount above that reopens the
+// remembered page — leaves `url` at `''`, so the one control that shows you where
+// you are opened blank. This mounts that exact state (the page was reopened from
+// memory, never typed) and clicks the chip.
+const chip = switched.querySelector('.dsa-loc')
+check(Boolean(chip), 'the address chip is rendered on the open page')
+const addrInput = () => switched.querySelector('.dsa-open input')
+check(addrInput() === null, 'and the bar is collapsed before the click, not already editing')
+if (chip) {
+  await act(async () => {
+    chip.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+  })
+}
+const input = addrInput()
+check(Boolean(input), 'clicking it expands the address bar for editing')
+check(Boolean(input) && input.value.length > 0,
+  'and the input is seeded with the address that is open, not left blank',
+  input ? `value was ${JSON.stringify(input.value)}` : 'no input rendered')
+check(Boolean(input) && input.value.includes('localhost:9999'),
+  'with the address /open accepts back, so it can be submitted unchanged',
+  input ? JSON.stringify(input.value) : '')
 
 console.log('')
 if (failures) {

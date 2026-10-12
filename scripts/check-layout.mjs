@@ -39,12 +39,38 @@ console.log('  preview minimum height:', minHeight && `${minHeight[1]}px`)
 ok(Number(minHeight && minHeight[1]) <= 200, 'the preview minimum is modest, not greedy')
 
 console.log('\n=== chrome rows must not grow ===')
-// The address bar is the one exception: once a page is open it is collapsed to a
-// single line, and the expanded input has to take the row's slack. Everything
-// else is fixed so the frame's height is predictable.
-for (const selector of ['.dsa-bar', '.dsa-hint', '.dsa-open-wrap']) {
+// Two fixed rows: the toolbar and the tab strip. The address bar is the one
+// control that must take the slack, and it does that INSIDE the toolbar row — the
+// arrangement the reader asked for, and the one that costs no third row. So the
+// toolbar is still size-capped, and the bar is the thing that grows within it.
+for (const selector of ['.dsa-bar', '.dsa-hint', '.dsa-tabs']) {
   const body = rule(selector)
   ok(/flex:0 0 auto/.test(body || ''), `${selector} is size-capped`, body && body.match(/flex:[^;]*/)?.[0])
+}
+{
+  const openWrap = rule('.dsa-open-wrap')
+  ok(/flex:1 1 auto/.test(openWrap || ''),
+    'the address bar takes the toolbar row\'s slack', openWrap && openWrap.match(/flex:[^;]*/)?.[0])
+}
+
+console.log('\n=== the tabs are one group, the address bar is a separate thing ===')
+// The reader's words: "标签页是一组、地址栏和标签页是分开独立存在的". They were two
+// rows stacked together, which read as one unit, and the toolbar above them had a
+// hole where the address belonged. Asserted as STRUCTURE, because both arrangements
+// are a toolbar, a strip and a bar in some order — only the nesting tells them apart,
+// and no rendered check can see it either (jsdom does no layout).
+{
+  const barAt = css.indexOf("className: 'dsa-bar'")
+  const stripAt = css.indexOf('h(TabStrip, {')
+  ok(barAt !== -1 && stripAt !== -1 && barAt < stripAt,
+    'the toolbar is rendered above the tab strip')
+  const toolbarRow = css.slice(barAt, stripAt)
+  ok(/h\(OpenBar, \{/.test(toolbarRow),
+    'the address bar is rendered INSIDE the toolbar row, not as a row of its own')
+  ok(!/h\(OpenBar, \{/.test(css.slice(stripAt, css.indexOf("className: 'dsa-warn'"))),
+    'and not again below the tab strip, where it used to sit')
+  ok(!/dsa-spacer/.test(css),
+    'the toolbar carries no spacer, because the address bar now fills that space')
 }
 
 console.log('\n=== the toolbar does not wrap ===')
@@ -70,6 +96,40 @@ ok(/position:(absolute|fixed)/.test(countBody || ''), 'the list floats over the 
 ok(!/dsa-list-wrap/.test(css), 'no permanent list block remains in the column')
 ok(/\.dsa-count\{/.test(css), 'the toolbar carries a counter')
 ok(/CountButton/.test(css), 'the counter component exists')
+
+console.log('\n=== the bulk clear cannot be scrolled out of the dialog ===')
+// The reader asked for a bulk clear in this dialog, believing there was none. There
+// was: it sat at the end of a single scrolling column, so a long list pushed it below
+// the fold — present, working, and out of sight, which reads exactly like missing.
+// The fix is which element scrolls, and that is a layout fact, so it is asserted here
+// rather than through the DOM: jsdom reports no heights, so a rendered check cannot
+// see the difference between a pinned bar and one that scrolls away.
+{
+  // The dialog is a column that clips, so its children can be laid out separately.
+  ok(/overflow:hidden/.test(countBody || '') && /display:flex/.test(countBody || ''),
+    'the dialog clips and lays out as a column, so one child can scroll and another cannot',
+    countBody && countBody.match(/overflow:[^;]*/)?.[0])
+  ok(/flex-direction:column/.test(countBody || ''), 'with the list above the bar')
+  // The list is the scroller.
+  const mainList = rule('.dsa-count-main .dsa-list')
+  ok(/overflow:auto/.test(mainList || ''),
+    'the LIST scrolls, not the dialog', mainList && mainList.match(/overflow:[^;]*/)?.[0])
+  ok(/min-height:0/.test(mainList || ''),
+    'and is allowed to shrink, or it would push the bar out instead of scrolling',
+    mainList && mainList.match(/min-height:[^;]*/)?.[0])
+  // The bar must not be inside that scroller, which is what makes it stay put.
+  const bar = rule('.dsa-count-main .dsa-bar')
+  ok(/flex:0 0 auto/.test(bar || ''), 'the action bar keeps its natural height', bar)
+  // Stated as structure, because CSS alone cannot express it: the bar and the list
+  // must be siblings under `.dsa-count-main`. A bar nested inside the list would
+  // scroll with the rows no matter how it is styled.
+  const main = css.slice(css.indexOf("className: 'dsa-count-main'"), css.indexOf('function AccentPicker'))
+  ok(/className: 'dsa-list'/.test(main) && /className: 'dsa-bar'/.test(main),
+    'the bar and the list are both direct children of the dialog body')
+  ok(main.indexOf("className: 'dsa-bar'") > main.indexOf("className: 'dsa-list'"),
+    'with the bar after the list, so it reads as the last action')
+  ok(/t\('panel\.removeAll'\)/.test(main), 'and it still holds the bulk clear')
+}
 
 console.log('\n=== guidance occupies the frame, never a row above it ===')
 // It used to be a row of its own above the frame, which pushed the page down even
@@ -121,12 +181,15 @@ console.log('\n=== the note card says how to commit ===')
 console.log('\n=== simulate the distribution in a narrow sidebar ===')
 // Pixels available to the panel in a short, narrow sidebar column.
 const usable = 640
-// One toolbar row and one address row. The menu, the picker and the discovered
-// list are all overlays or fixed-position popovers, so they cost zero column
-// height — that is the whole reason for the change.
+// Two rows of chrome: the toolbar (which now contains the address bar) and the
+// tab strip. The menu, the picker and the discovered list are all overlays or
+// fixed-position popovers, so they cost zero column height — that is the whole
+// reason for the change. Three rows is what this asserts against: the address bar
+// used to be a row of its own below the strip, and that is the arrangement the
+// reader rejected.
 const rows = {
   toolbar: 28,
-  address: 28,
+  tabs: 25,
   gaps: 2 * 8,
 }
 const chrome = Object.values(rows).reduce((a, b) => a + b, 0)
@@ -135,7 +198,7 @@ console.log('  usable height      :', usable)
 console.log('  fixed rows         :', chrome, JSON.stringify(rows))
 console.log('  preview gets       :', forPreview, `(${Math.round((forPreview / usable) * 100)}%)`)
 ok(forPreview > 520, 'the preview keeps the large majority of the column', `${forPreview}px`)
-// The old design spent 4 rows on chrome. Assert the regression cannot come back.
+// A third row would put this over. Assert the regression cannot come back.
 ok(chrome <= 72, 'chrome costs at most two rows', `${chrome}px`)
 
 console.log('')

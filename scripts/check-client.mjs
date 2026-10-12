@@ -139,3 +139,6 @@ const tagged = ordered.map((entry) => (entry.note ? 'note' : 'mark'))
 assert.deepEqual(tagged, ['note', 'mark'], 'both a note and a bare mark are kept')
 
 console.log('\nALL CLIENT CHECKS PASSED')
+// Explicit exit, because mounting the panel leaves a heartbeat interval running while
+// pages are open, so the event loop no longer drains on its own.
+process.exit(0)

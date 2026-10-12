@@ -13,8 +13,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![DSH plugin](https://img.shields.io/badge/DSH-plugin-4d6bfe.svg)](https://github.com/TheYoungChen/dsh-annotate)
 [![no browser extension](https://img.shields.io/badge/no-browser%20extension%20needed-success.svg)](#先说清楚不需要装浏览器扩展)
-[![tests](https://img.shields.io/badge/tests-39%20passing-brightgreen.svg)](scripts)
-[![mutation](https://img.shields.io/badge/mutation-38%2F38%20caught-blueviolet.svg)](scripts/mutate.mjs)
+[![tests](https://img.shields.io/badge/tests-52%20passing-brightgreen.svg)](scripts)
+[![mutation](https://img.shields.io/badge/mutation-92%2F92%20caught-blueviolet.svg)](scripts/mutate.mjs)
+[![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/theyoungchen/dsh-annotate)
 
 <img src="assets/hero.png" alt="dsh-annotate：左侧对话，右侧侧边栏预览里两个元素带高亮框，下方列出对应标注" width="100%">
 
@@ -83,9 +84,13 @@ AI 拿到的是 `.lb-hero` 和它的真实文本，不是一句模糊描述。
   生成的结果会先验证**唯一且指向你点的那一个**，不唯一时用元素文本消歧；
   实在定位不了会明确告诉你，而不是默默丢掉、留下一个对不上的编号
 - **一次带上多条** —— 按页面从上到下排序，编号与页面里的标记针一一对应
+- **换页不丢标注** —— 单页应用里点菜单换了路由，已经标好的东西照样挂着；
+  标记针只画在它当初所在的那个页面上，列表和"已附加"计数不受影响
+- **地址栏显示真实地址** —— 显示的是页面**现在**的完整地址（含路径、`?query` 和 `#/hash`），
+  而不是被代理分配的端口号，换页时跟着更新
 - **不弄脏你的消息** —— 标注作为独立上下文投递，你打的字里看不到它，也不会被误删
 - **技术栈识别** —— 自动探测本地端口并识别框架（Vite / Next / React / Vue 等）
-- **同源代理** —— 不裸嵌目标页，cookie 与 localStorage 按预览隔离
+- **本地代理** —— 不裸嵌目标页；与宿主同 site（所以登录态可用），存储按 origin 与宿主隔开
 
 ## 三个特色
 
@@ -240,11 +245,29 @@ pnpm dsh web --port 3000
 **没有需求就不发。** 标注是上下文而非消息，草稿为空时没有可附着的对象，此时会提示你先写
 要求，而不是替你发一条空消息。
 
+**"附上了什么"和"屏幕上有什么"是两个问题，答案不再共用一个。** 标注按**会话**存一份，
+每条再记下自己是在哪个路由上标的。于是换路由时列表、计数、"已附加"全都原样保留，而标记针
+只画在它当初所在的那个页面上 —— 按路由存整份列表会让切页面等于丢标注，按会话存而不管路由
+又会让针飘到别的页面上。列表里有多个页面的标注时，每条会多显示一行它来自哪个路由；
+交给模型的那段文本同理，只有当标注横跨多个路由时才会带上 `page:` 一行。
+
+**换了页面要记得回来。** 侧边栏切到别的标签页时，标注面板整个被卸载，回来就是全新的空状态 ——
+连"刚才看的是哪个页面"都不记得了。所以打开的地址按会话记在小容量存储里，面板重建时自动重开。
+重开**不能**清空列表：面板的镜像逻辑会把"从 N 条变成 0 条"读成用户主动清空并上报，
+宿主随即丢弃这批标注并推进 epoch，dock 又会去清空页面 —— 一次切标签页就能毁掉它本该保住的东西。
+所以只有真正换到**另一个**页面才清空。
+
+**宿主是那个"还欠着"的一侧，所以面板重建时要问它。** 面板被卸载后没有任何状态可比对，
+光"沉默不上报"只能避免清空宿主，自己仍然是空的，而输入框上的胶囊还在计数 —— 这就是
+"侧边栏里所有标注都消失了"的来源。因此 `/pending` 除了数量还回传**列表本身**，面板挂载时
+认领它。跨页面的 `restore` 消息让页面把宿主手里的那份接回去，这样预览被回收重建
+（新的 origin，页内存储是空的）之后，标注仍然回得来。
+
 ## 工作原理
 
 ```
 DSH 宿主
-  └─ lib/index.js       起同源代理 + HTTP API + 注册运行时上下文
+  └─ lib/index.js       起本地代理（同 site、不同 origin）+ HTTP API + 注册运行时上下文
         ↓ 代理                              ↑ 标注按会话存在这里
      目标应用                                 │
   lib/shim.js      改写 fetch/XHR/WebSocket，让子请求也走代理
@@ -272,8 +295,10 @@ DSH 宿主
 
 三个关键点：
 
-1. **同源代理** —— 不直接嵌目标页。插件在 harness 源上起一个小代理转发过去，侧边栏嵌的是**代理**。
-   同源，所以注入的拾取器能读 DOM；而目标应用的 cookie / localStorage 和 harness 隔开。
+1. **本地代理** —— 不直接嵌目标页。插件在 loopback 上起一个小代理转发过去，侧边栏嵌的是**代理**。
+   代理与宿主**同 hostname、端口不同**，所以它是同 site 的另一个 origin：注入的拾取器能读 DOM，
+   目标应用的 `localStorage` / `sessionStorage` 和 harness 隔开，而目标应用自己的登录
+   cookie 能正常存取（同 site 才不会被浏览器的跨站限制拒收）。
 2. **剥掉六个阻止嵌入的响应头** —— `x-frame-options`、`content-security-policy`（含 report-only）、
    `cross-origin-opener-policy`、`cross-origin-embedder-policy`、`cross-origin-resource-policy`。
    任何一个在，页面就是白屏。
@@ -288,12 +313,17 @@ DSH 宿主
   `.` 开头的路径段直接 403。需要预览工作区外的文件时，显式打开 `allowExternalFiles`。
 - **预览不能被别的站点读**。带 `Sec-Fetch-Site: cross-site` 的请求会被拒。
 - **cookie 按目标分区**。回程 `set-cookie` 会加目标前缀并改写路径，两个预览之间不会串味。
+  注意 cookie 的作用域是 **site（hostname）而不是 origin（含端口）**：所以预览之间、
+  以及预览与宿主之间共用同一份 cookie 存储。前缀保证了不同目标不会互相覆盖。
 
 ## 已知限制
 
 这些是这类方案共同的硬限制，不是 bug：
 
-- 走 OAuth 跳转的登录流程
+- **账号密码登录本身没有限制**，能正常用。列在这里的是登录的**几种特例**：
+  - 走 OAuth 跳转、且跳到**外部站点**的流程（会离开预览）
+  - 依赖 `SameSite=None; Secure` 的 cookie：预览是 `http://`，这类 cookie 在非 HTTPS
+    下会被浏览器丢弃，所以要求它的站点登录不上
 - 严格 CSP 的站点（`frame-ancestors` 被剥了，但页面内联脚本仍可能被 CSP 挡）
 - Service Worker 驱动的离线应用
 - Shadow DOM 内部、Canvas 绘制的内容
@@ -306,19 +336,50 @@ DSH 宿主
   想改主意就在发送前直接在侧边栏删掉那一条。
 - **草稿为空时不发送**。标注是上下文不是消息，没有你写的字就没有可附着的对象 ——
   这时会提示你先写要求，而不是替你发一条空消息。
+- **一个会话最多同时开 4 个页面**。侧边栏的标注面板里有标签页条和地址栏，像浏览器一样：
+  点标签切换、点 × 关闭，多个页面同时活着（切回去不是重新加载，滚动位置和页面里
+  没保存的输入都还在）。上限是 4 个 —— 每个标签页是一整个文档、有自己的一套定时器，
+  真正的开销是 iframe 数量而不是心跳。开到第 5 个时最早的那个自动退场，并会提示你。
+  关掉的页面**不会丢标记**：那些标记仍在列表和批次里，只是标注为"来自已关闭的页面"，
+  并保留关闭前最后观测到的匹配数 —— 选择器只有原来那个文档才解析得了，
+  所以这里不假装它还定位得到。
+  - **怎么开第二个页面**：标签条最右边的 **+**，点它清空并展开地址栏，输入地址回车即新增
+    一个标签。标签条从**第一个页面起**就在（否则"开第二个"这个动作本身没有入口）。
+  - **标签页是一组，地址栏是另外一条。** 地址栏住在**工具栏那一行**（"选取"和刷新/菜单之间），
+    标签页条独占下面一行 —— 两条互不从属。之前地址栏是标签条正下方的独立一行，两者叠在
+    一起像同一个东西，而工具栏中间空着一大块没用上的宽度。
+  - **"选取"是整个面板共用的，不是每个页面一套。** 打开选取之后切标签，它还是开着的，
+    新页面也照样能点着标注 —— 标签页之间只是内容不同，对标注来说它们都是页面。
+    区分"选取中"和"未开启"的只有这一个状态，所以它属于面板。
+  - **同一个应用的多个路由算多个页面**。`localhost:5173/a` 和 `localhost:5173/b` 是两个
+    标签，各自有各自的标记 —— 预览身份用的是完整地址而不是 `origin`。这一点曾经是错的：
+    按 origin 复用会让第二个地址拿回第一个的预览，表现就是**永远只有一个标签页**，
+    而且根本开不出第二个。
+  - **同一个文件夹里的多个本地页面也算多个页面**。工作区页面按**文件**复用，
+    不是按它所在的目录 —— 否则放在一起的两个页面共用一个身份，第二个同样只能拿回第一个的
+    预览。这是上面那个 origin 缺陷的同类，发生在 `file://` 那一支上。
+- **`localStorage` 活不过预览本身，登录态可以。** 这两件事的存储作用域不同，
+  之前把它们并成一句是错的：
+  - **`localStorage` / `sessionStorage` 按 origin 划分**，预览每次新建都监听随机端口，
+    就是新的 origin —— 所以页内存储是空的，被回收（默认 5 分钟不动）后重开也一样。
+    这是隔离的代价，也是刻意的：被标注的页面读不到这个工作区的任何东西。
+  - **cookie 按 site 划分**，不含端口 —— 预览与宿主同 hostname，所以**登录 cookie 在
+    预览重建后依然有效**，长时间不动被回收、再打开通常仍是登录状态，不用重新登。
+    回程 `set-cookie` 仍会加目标前缀转发，不会串味。
+  - 换句话说：**登录能用，页内存储不保留**。要重置登录态，清掉该 hostname 下的 cookie。
 
 ## 开发
 
 ```bash
-# 回归测试（39 项）
+# 回归测试（52 项）
 node scripts/preflight-activation.mjs   # 激活链（真实 composeEntries）
 node scripts/preflight-shapes.mjs       # 注册形状对真实 slot key 校验
 node scripts/preflight-profile.mjs      # profile 里恰好一行 annotate
 node scripts/check-boot.mjs             # overlay 挂载（head/body 两种注入位置）
-node scripts/check-overlay.mjs          # 标记 / 批注 / 空标注保留 / 卡片停靠 / 编号连续
+node scripts/check-overlay.mjs          # 标记 / 批注 / 空标注保留 / 卡片停靠 / 编号连续 / 空白处不算选中
 node scripts/check-client.mjs           # 客户端接线
 node scripts/check-client-dom.mjs       # 真实 DOM 渲染
-node scripts/check-layout.mjs           # 空间分配、detect 唯一入口、浮层不被对话盖住
+node scripts/check-layout.mjs           # 空间分配、地址栏占工具栏那一行、detect 唯一入口、浮层不被对话盖住、批量清除不会被滚出视野
 node scripts/check-filepreview.mjs      # 文件预览入口 URL
 node scripts/check-stacks.mjs           # 技术栈指纹（9 种，含"认不出就不猜"）
 node scripts/check-selectors.mjs        # 选择器在真实页面上唯一
@@ -346,14 +407,36 @@ node scripts/check-sidebar-crash.mjs    # 侧边栏在异常输入下不崩
 node scripts/check-structure.mjs        # 三个源文件的结构完整（头部没被截掉、括号配平）
 node scripts/check-detection.mjs        # 端口清单含 Tauri；每个技术栈都有 logo
 node scripts/check-target-gate.mjs      # 预览目标白名单与 README 的承诺一致（含 SSRF 缺口）
+node scripts/check-route-key.mjs        # 换页不丢标注：列表按会话存、pin 按路由画，编号跨页不变
+node scripts/check-address-chip.mjs     # 地址栏显示完整真实地址（含 #/hash），过长从左侧截断
+node scripts/check-chip-dom.mjs         # 批注胶囊真的挂进 DOM：计数、展开、异常 props 不崩
+node scripts/check-chip.mjs             # 已发送气泡下方的批注胶囊：读回宿主写的块、只认自己那条消息、落在折叠窗口之外
+node scripts/check-count-popup.mjs      # 计数弹窗：批量清除可及、编辑后弹窗自己关掉、清空真的上报空批次
+node scripts/check-delete-stickiness.mjs # 在页面上删掉最后一条标注后，它不会又被宿主塞回来
+node scripts/check-host-asset-freshness.mjs # overlay 改动必须进到"当前这一次"响应里，不能等到重启宿主
+node scripts/check-preview-login.mjs      # 预览 iframe 与宿主同 site，登录会话 cookie 才留得住
+node scripts/check-tabs.mjs               # 多标签页：加页面而不是换页面、标记按页面分、关页面留标记、地址栏入住工具栏那一行
+node scripts/check-preview-reuse.mjs      # 预览复用身份：同应用不同路由、同目录不同文件都是两个预览
+node scripts/check-tabs-dom.mjs           # 真的渲染一遍面板数标签：点 + 能开出同应用的第二个页面；关一个剩一个
+node scripts/check-release.mjs            # 更新日志两份都在：CHANGELOG 有这一版、Release 正文存在且写的是这一版
 
-# 变异检测：注入 38 个故障，每一个都必须被抓到
+# 变异检测前先自检：每个变异都带一个字面锚点，源码一改就可能失配；
+# 失配时变异根本没注入，受检代码等于好代码，"通过"是假的
+node scripts/check-mutation-anchors.mjs
+
+# 真 cordis、真 bundle：会话服务晚到时胶囊仍要注册（这正是它曾经整个不显示的成因），
+# 服务永不到时插件仍要 ACTIVE —— 否则 dsh web 的启动自检会判定该条未激活
+node scripts/check-real-registration.mjs
+
+# 变异检测：注入 92 个故障，每一个都必须被抓到
 node scripts/check-preflight-power.mjs
 
 # 对一个真实运行中的实例复查（默认 3099，先起好）
 node scripts/check-preview-inline.mjs http://127.0.0.1:3099
 # 直接问正在跑的那个进程（默认 3080）：它实际送出的是哪一版 overlay
 node scripts/check-live-host.mjs http://127.0.0.1:3080
+# 正在跑的进程送出的 overlay 里，这一轮的改动到底在不在（换个版本号骗不过它）
+node scripts/check-live-overlay.mjs http://127.0.0.1:3080
 # 刷新在代理已被回收之后仍然可用（这正是 "localhost 拒绝连接" 那条）
 node scripts/check-reload.mjs http://127.0.0.1:3080
 

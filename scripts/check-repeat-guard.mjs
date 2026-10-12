@@ -271,6 +271,47 @@ const settled = await call('/__dsh-annotate/pending', { session: STALE })
 check(settled.count === 0, 'and it stays gone', String(settled.count))
 
 console.log('')
+console.log('=== re-reporting a batch the host is HOLDING is idempotent ===')
+// The other half of the guard, and the one that was silently destructive. The
+// sidebar re-uploads its whole list whenever the page re-announces it — on every
+// route change, and on every remount. Writing the clear-marker on each of those
+// ordinary reports armed the stale guard with the report's OWN signature, so the
+// very next identical upload was read as "a stale repeat of something cleared"
+// and deleted with `ignored: 'already delivered'` — although nothing had been
+// delivered and the reader still had the marks on screen. The attachment died
+// while the panel went on showing it.
+const IDEMPOTENT = 'sess-idempotent'
+await call('/__dsh-annotate/context', { session: IDEMPOTENT, annotations: MARKS })
+const heldOnce = await call('/__dsh-annotate/pending', { session: IDEMPOTENT })
+check(heldOnce.count === 2, 'the first report is held', String(heldOnce.count))
+const again = await call('/__dsh-annotate/context', { session: IDEMPOTENT, annotations: MARKS })
+check(again.count === 2, 'an identical re-report keeps it', `count=${again.count}`)
+check(again.ignored === undefined, 'and is not answered as stale',
+  `ignored=${JSON.stringify(again.ignored)}`)
+const heldTwice = await call('/__dsh-annotate/pending', { session: IDEMPOTENT })
+check(heldTwice.count === 2, 'the batch is still there to be attached', String(heldTwice.count))
+// And it is still genuinely deliverable — the point of holding it.
+check((await attachedAt(IDEMPOTENT)).includes('Element 1'),
+  'and it still reaches the model afterwards')
+
+console.log('')
+console.log('=== the host hands the held entries back, not just a count ===')
+// A remounted sidebar has no state and nothing to compare against, so a bare
+// count left it unable to tell "the host holds three marks" from "nothing was
+// ever reported": its list rendered empty while the composer capsule went on
+// counting. The reader saw exactly that after switching tabs.
+const REMOUNT = 'sess-remount'
+await call('/__dsh-annotate/context', { session: REMOUNT, annotations: MARKS })
+const recovered = await call('/__dsh-annotate/pending', { session: REMOUNT })
+check(Array.isArray(recovered.annotations), 'the poll carries the entries themselves')
+check(recovered.annotations.length === 2, 'both of them', String(recovered.annotations.length))
+check(recovered.annotations[0].selector === '.a' && recovered.annotations[0].note === 'first',
+  'with the fields the panel renders')
+const emptyOne = await call('/__dsh-annotate/pending', { session: 'sess-nothing-held' })
+check(Array.isArray(emptyOne.annotations) && emptyOne.annotations.length === 0,
+  'a session holding nothing reports an empty list rather than a missing field')
+
+console.log('')
 console.log('=== a genuinely new batch is still accepted ===')
 // The guard must not swallow a real request: a reader who marks something else
 // straight afterwards is asking for it to go.

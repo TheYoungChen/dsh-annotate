@@ -120,8 +120,13 @@ console.log('\n=== an unplaceable annotation is announced, not dropped ===')
   )
   ok(/unplaced\.push\(/.test(render), 'an unplaceable annotation is collected')
   ok(/post\('unplaced'/.test(render), 'and reported to the panel')
-  ok(/total: state\.annotations\.length/.test(render),
-    'the report carries the total, so the two numbers can be reconciled')
+  // `here.length`, not the whole list: the marks made on OTHER views of the same
+  // app are not failures to place, and counting them as such told the reader the
+  // page had changed under them when they were simply looking at a different page.
+  ok(/total: here\.length/.test(render),
+    'the report carries the total for this route, so the two numbers can be reconciled')
+  ok(/session: state\.annotations\.length/.test(render),
+    'and the session total, so marks on other pages are accounted for rather than lost')
   ok(!/if \(!anchor\) return\b/.test(render),
     'it is no longer a silent early return')
 }

@@ -46,11 +46,22 @@ global.IS_REACT_ACT_ENVIRONMENT = true
 
 /** What the host claims to hold, so the capsule can be compared against it. */
 let hostCount = 0
+/**
+ * The entries the host hands back alongside the count.
+ *
+ * It always answered with these — the capsule was simply keeping the count and
+ * dropping the rest — so the expandable detail costs no extra request. Modelled here
+ * because a fake that returned a count and no entries would let a broken panel pass:
+ * the panel would show its "nothing to show" note and look deliberate.
+ */
+let hostEntries = []
 const requests = []
 global.fetch = async (url, options) => {
   const u = String(url)
   requests.push({ url: u, body: options && options.body ? JSON.parse(options.body) : null })
-  if (u.endsWith('/pending')) return { json: async () => ({ ok: true, count: hostCount, block: '' }) }
+  if (u.endsWith('/pending')) {
+    return { json: async () => ({ ok: true, count: hostCount, annotations: hostEntries, block: '' }) }
+  }
   if (u.endsWith('/context')) return { json: async () => ({ ok: true, count: hostCount }) }
   return { json: async () => ({ ok: true, servers: [], pages: [] }) }
 }
@@ -122,6 +133,11 @@ console.log('=== marking something makes it appear, with no button pressed ===')
 // mark made in the sidebar shows up here without any hand-over step. The state
 // is set before rendering, because the component reads once on mount.
 hostCount = 3
+hostEntries = [
+  { selector: '.l2 > span:nth-of-type(3) > b', text: '默认 · vip', note: '再次测试批注', page: '' },
+  { selector: '.pa-grid > div:nth-of-type(1) span:nth-of-type(2)', text: 'Bindings', note: '', page: '' },
+  { selector: '.l1 > button', text: '编辑', note: '', page: '' },
+]
 const host2 = document.createElement('div')
 document.body.appendChild(host2)
 const root2 = createRoot(host2)
@@ -138,17 +154,71 @@ if (capsule) {
   check(/标注/.test(text), 'it says what the count refers to', text)
   check(capsule.getAttribute('title') && capsule.getAttribute('title').length > 0,
     'it explains itself on hover', capsule.getAttribute('title'))
-  // No "attach" affordance: the marks are already attached.
-  check(capsule.querySelectorAll('button').length === 0, 'it is not a button', capsule.outerHTML.slice(0, 120))
+  // The marks are already attached, so the control opens a list rather than
+  // performing the attachment. It IS a control, though: it is the only way to reach
+  // its own detail, so it has to be reachable from the keyboard.
+  check(capsule.tagName === 'BUTTON', 'it is a button, so its detail is reachable', capsule.tagName)
+  check(capsule.getAttribute('aria-expanded') === 'false', 'and reports itself collapsed')
+  check(!/再次测试批注/.test(host2.textContent), 'the detail stays hidden until it is opened')
 }
 
 console.log('')
-console.log('=== the count follows the host, not a local copy ===')
-// A change made after mount is picked up by the next poll.
-hostCount = 5
+console.log('=== opening it lists what this batch actually carries ===')
+// The reader's ask: the pill used to say only "3 attached", which answers "how many"
+// and nothing else. The interesting question before sending is "which ones".
+await act(async () => {
+  capsule.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+})
+const opened = host2.textContent
+check(/再次测试批注/.test(opened), 'the note is shown once opened', opened.slice(0, 200))
+check(/\.l2 > span:nth-of-type\(3\) > b/.test(opened), 'and so is the selector it belongs to')
+check(/默认 · vip/.test(opened), 'and the element\'s own text')
+check(/Bindings/.test(opened), 'every mark is listed, not just the first')
+check(/编辑/.test(opened), 'and the last one too')
+// The number is the row's position, which is the same number the host writes as
+// `## Element n` and the sidebar and the pins show. A surface that numbered its rows
+// differently would make "element 2" ambiguous between two windows.
+const nums = [...host2.querySelectorAll('.dsa-chip-num')].map((el) => el.textContent)
+check(nums.join(',') === '1,2,3', 'the rows are numbered in order', nums.join(','))
+check(capsule.getAttribute('aria-expanded') === 'true', 'the control now reports itself expanded')
+const list = host2.querySelector('.dsa-chip-list')
+check(list !== null, 'the detail is a real list element')
+check(list && list.className.includes('dsa-capsule-list'),
+  'and is marked as the capsule\'s own, so its container styling can win over the shared row rule',
+  list ? list.className : 'none')
+// The extra request would be wasted work: the count and the entries arrive in the
+// same answer, so opening must not fetch anything.
+const before = requests.length
+await act(async () => {
+  capsule.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+})
+check(requests.length === before, 'opening and closing costs no request', `${requests.length - before} extra`)
+check(!/再次测试批注/.test(host2.textContent), 'and closing hides the detail again')
+
+console.log('')
+console.log('=== the detail never describes a different batch than the count ===')
+// Both come from the same answer, so a change the reader made elsewhere has to move
+// them together. A list that lagged the count by one answer would be the one fault
+// here that cannot be detected by looking: both halves are individually plausible.
+await act(async () => { await new Promise((r) => setTimeout(r, 1100)) })
+hostCount = 1
+hostEntries = [{ selector: '.l1 > button', text: '编辑', note: '只剩一条', page: '' }]
 await act(async () => { await new Promise((r) => setTimeout(r, 1200)) })
-check(/5/.test(host2.querySelector('.dsa-capsule') ? host2.querySelector('.dsa-capsule').textContent : ''),
-  'it picks up a change made elsewhere')
+// Reopened, because the closing case above deliberately left it shut. The point is
+// what the list contains once it is shown again, not that a shut list updates.
+await act(async () => {
+  capsule.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+})
+const shrunk = host2.textContent
+check(/1/.test(shrunk), 'the count follows the host down')
+check(host2.querySelectorAll('.dsa-chip-item').length === 1,
+  'and so does the open list, from the same answer',
+  String(host2.querySelectorAll('.dsa-chip-item').length))
+check(/只剩一条/.test(shrunk), 'showing the surviving mark, not the cleared ones')
+check(!/Bindings/.test(shrunk), 'and none of the ones the host no longer holds')
+
+console.log('')
+console.log('=== nothing is left over when the host lets go ===')
 
 console.log('')
 console.log('=== the host clears it when the turn starts ===')
@@ -161,6 +231,64 @@ check(polled.length > 0, 'it asks the host rather than guessing', `${polled.leng
 check(polled.some((r) => r.body && r.body.session === 'sess-1'),
   'and it asks about the session the dock belongs to',
   JSON.stringify(polled[0] && polled[0].body))
+
+console.log('')
+console.log('=== a slow answer cannot undo a newer one ===')
+// The capsule polls on a 1s clock and `fetch` answers on its own schedule, so two
+// polls can be in flight together and the OLDER answer can land last. It is not
+// cosmetic: the poll right after a send asks "how many are still held", the host
+// answers 0 because the turn consumed them, and a straggler from a second earlier
+// then writes the pre-send count back. The reader sees the capsule stay up after a
+// message that already went out — reported as "发送消息后对话栏上方胶囊不消失" — and
+// the sidebar and the capsule then disagree about a number the host has changed.
+//
+// Answered out of order on purpose, because that is the only way this reproduces:
+// the newer poll resolves with the cleared count, then the older one resolves with
+// the count it read a moment before.
+const pendingPolls = []
+global.fetch = window.fetch = (url, options) => {
+  if (!String(url).endsWith('/pending')) return Promise.resolve({ json: async () => ({ ok: true }) })
+  return new Promise((resolve) => {
+    pendingPolls.push({ resolve, body: options && options.body ? JSON.parse(options.body) : null })
+  })
+}
+const host3 = document.createElement('div')
+document.body.appendChild(host3)
+const root3 = createRoot(host3)
+await act(async () => {
+  root3.render(React.createElement(Dock, { zone }))
+})
+// Let the second poll join the first, so both are in flight at once.
+await act(async () => { await new Promise((r) => setTimeout(r, 1100)) })
+check(pendingPolls.length >= 2,
+  'two polls are in flight together, which is what makes the race possible',
+  `${pendingPolls.length} outstanding`)
+
+if (pendingPolls.length >= 2) {
+  const stale = pendingPolls[0]
+  const fresh = pendingPolls[pendingPolls.length - 1]
+  // The newer poll answers first: the turn consumed the batch, nothing is held.
+  await act(async () => {
+    fresh.resolve({ json: async () => ({ ok: true, count: 2, epoch: 1 }) })
+  })
+  await act(async () => { await new Promise((r) => setTimeout(r, 30)) })
+  check(root3 && host3.querySelector('.dsa-capsule') !== null,
+    'the newer answer is applied', host3.textContent)
+
+  // Then the straggler, carrying the count the host held BEFORE the send.
+  await act(async () => {
+    stale.resolve({ json: async () => ({ ok: true, count: 9, epoch: 1 }) })
+  })
+  await act(async () => { await new Promise((r) => setTimeout(r, 60)) })
+  const after = host3.querySelector('.dsa-capsule')
+  const shown = after ? after.textContent : ''
+  check(!/9/.test(shown),
+    'and the older answer is dropped rather than written back',
+    `capsule shows ${JSON.stringify(shown)}`)
+  check(root3 && /2/.test(shown),
+    'leaving the newer count in place', JSON.stringify(shown))
+}
+await act(async () => { root3.unmount() })
 
 console.log('')
 await act(async () => { root.unmount() })
